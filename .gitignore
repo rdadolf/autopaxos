@@ -1,0 +1,10 @@
+log.txt
+*.DS_Store
+*.o
+*.dSYM
+paxos.cc
+paxos.hh
+network.cc
+network.hh
+main.cc
+main

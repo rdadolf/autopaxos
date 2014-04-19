@@ -1,0 +1,240 @@
+// -*- mode: c++ -*-
+#ifndef _PAXOS_THH
+#define _PAXOS_THH
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include "mpfd.hh"
+#include "rpc_msg.hh"
+#include "log.hh"
+#include "network.hh"
+#include <netdb.h>
+
+#define WAIT            0   // waiting to start
+#define PREPARE         1   // prepare message
+#define ACCEPT          2   // accept message
+#define DECIDED         3   // decided message
+#define PREPARED        4   // prepared message
+#define ACCEPTED        5   // accepted message
+#define HEARTBEAT       6   // keepalive message
+
+// mmap file region for persistance
+#define MAP_SIZE        1024
+
+namespace paxos {
+
+class Paxos_Server;
+
+class Paxos_Proposer{
+public:
+    typedef Paxos_Proposer ppropose_type;
+
+    Paxos_Server* me_;
+
+    String hostname;
+    std::vector<int> ports;
+    std::vector<tamer::fd> cfd;
+    std::vector<modcomm_fd> mpfd;
+    std::vector<RPC_Msg> res;
+    int f;
+    int n_p,n_o,a;
+    int uid_;
+    Json v_o,v_c; // v_c is the value to choose
+
+    // persist to disk
+    int fd_;
+    char* mapd;
+
+
+    Paxos_Proposer(Paxos_Server* me,int uid, const char* host,std::vector<int> ps,int f_i) :
+        me_(me),
+        hostname(host), ports(ps),
+        cfd(ps.size()),
+        mpfd(ps.size()),
+        res(ps.size()),
+        f(f_i), n_p(0), uid_(uid),
+        v_o(Json::null), v_c(Json::null){
+
+        String fn(uid_);
+        fn += "_proposer_persist";
+        fd_ = open(fn.c_str(),O_RDWR|O_CREAT);
+        ftruncate(fd_,MAP_SIZE);
+        mapd = (char*) mmap(NULL, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, 0); //FIXME: AMOUNT? 
+        String s;
+        char* ptr = mapd;
+        for (; *ptr; ++ptr)
+            s += *ptr;
+        Json tmp = Json::parse(s);
+        if (tmp["n_p"] != Json::null) {
+            assert(tmp["n_p"].is_i());
+            n_p = tmp["n_p"].as_i();
+            INFO() << "PERSISTED n_p: " << n_p;
+        }
+        persist();
+    }
+    ~Paxos_Proposer() {
+        for (std::vector<int>::size_type i = 0; i < ports.size() ; ++i)
+            cfd[i].close();
+        ports.clear();
+        cfd.clear();
+        mpfd.clear();
+        res.clear();
+        munmap(mapd, MAP_SIZE);
+        close(fd_);
+        String fn(uid_);
+        fn += "_proposer_persist";
+        remove(fn.c_str()); // remove persisted file
+    }
+    void set_vc(Json v) {
+        v_c = v;
+    }
+    void persist() {
+        Json tmp = Json::object("n_p",n_p);
+        String s = tmp.unparse();
+        memset(mapd,0,MAP_SIZE);
+        memcpy(mapd,s.c_str(),s.length());
+    }
+
+    tamed void proposer_init(tamer::event<> done);
+    tamed void client_init(const char* hostname, int port, tamer::fd& cfd, 
+                            modcomm_fd& mpfd, struct in_addr& hostip,tamer::event<> done);
+    tamed void send_to_all(RPC_Msg& req);
+    tamed void run_instance(Json v,tamer::event<Json> done);
+    tamed void propose(int n, Json v,tamer::event<> done);
+    tamed void accept(int n, tamer::event<> done);
+
+    tamed void send_heartbeat(tamer::event<> done);
+    
+};
+
+class Paxos_Acceptor{
+public:
+    typedef Paxos_Acceptor paccept_type;
+
+    Paxos_Server* me_;
+
+    int port;
+    Json v_a;
+    int n_l, n_a;
+
+    // persist to disk
+    int fd_;
+    char* mapd;
+
+
+    Paxos_Acceptor() : 
+        me_(NULL),
+        port(18029),
+        v_a (Json::make_array()), 
+        n_l(0),n_a(0) {
+
+        persist_init();
+    }
+    Paxos_Acceptor(Paxos_Server* me,int p) : 
+        me_(me),
+        port(p),
+        v_a (Json::make_array()), 
+        n_l(0),n_a(0) {
+
+        persist_init();
+    }
+
+    ~Paxos_Acceptor() {
+        munmap(mapd, MAP_SIZE);
+        close(fd_);
+        String fn(port);
+        fn += "_acceptor_persist";
+        remove(fn.c_str()); // remove persisted file
+    }
+
+    void persist_init(){ 
+        String fn(port);
+        fn += "_acceptor_persist";
+        fd_ = open(fn.c_str(),O_RDWR|O_CREAT);
+        ftruncate(fd_,MAP_SIZE);
+        mapd = (char*) mmap(NULL, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, 0); //FIXME: AMOUNT? 
+        String s;
+        char* ptr = mapd;
+        for (; *ptr; ++ptr)
+            s += *ptr;
+        Json tmp = Json::parse(s);
+        if (tmp["n_a"] != Json::null && tmp["n_l"] != Json::null
+            && tmp["v_a"] != Json::null) {
+            assert(tmp["n_a"].is_i() && tmp["n_l"].is_i());
+            n_a = tmp["n_a"].as_i();
+            n_l = tmp["n_l"].as_i();
+            v_a = tmp["v_a"];
+            INFO() << "PERSISTED n_a: " << n_a;
+            INFO() << "PERSISTED n_l: " << n_l;
+            INFO() << "PERSISTED v_a: " << v_a;
+        }
+        persist();
+    }
+
+    void persist() {
+        Json tmp = Json::object(
+            "n_a", n_a,
+            "n_l", n_l,
+            "v_a", v_a
+        );
+        memset(mapd,0,MAP_SIZE);
+        String s = tmp.unparse();
+        memcpy(mapd,s.c_str(),s.length());
+    }
+
+    tamed void acceptor_init(tamer::event<> done);
+    tamed void handle_request(tamer::fd cfd);
+    tamed void prepare(modcomm_fd& mpfd, RPC_Msg& req,int n);
+    tamed void accept(modcomm_fd& mpfd, RPC_Msg& req, int n, Json v);
+    tamed void decided(modcomm_fd& mpfd, RPC_Msg& req,Json v);
+    tamed void receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req);
+};
+
+// class for getting the ports of the other members in the quorum
+class Paxos_Server {
+friend class paxos::Paxos_Proposer;
+friend class paxos::Paxos_Acceptor;
+private: 
+    tamer::rendezvous<bool> elect_me_;
+    typedef enum { FILE=1, DIR } Filetype_t;
+    int listen_port_;
+    int master_;
+    int master_timeout_;
+    int epoch_; // everything is going to start in epoch 0; once a master is elected, it moves to epoch 1
+    Json config_;
+
+    // Paxos Stuff
+    int paxos_port_;
+    msgpack_fd paxm_mpfd_;
+    Json paxi_;
+    paxos::Paxos_Proposer* proposer_;
+    paxos::Paxos_Acceptor* acceptor_;
+public:
+    Paxos_Server(int port, int paxos, Json config);
+    ~Paxos_Server() {
+        delete proposer_;
+        delete acceptor_;
+    }
+
+    bool i_am_master() {
+        return master_ == paxos_port_;
+    }
+
+    tamed void run_master_server();
+    tamed void paxos_init(tamer::event<> ev);
+    tamed void listen_for_heartbeats();
+    tamed void handle_new_connections();
+    tamed void read_and_dispatch(tamer::fd client);
+
+    // Paxos functions
+    tamed void elect_me(tamer::event<Json> ev);
+    tamed void beating_heart();
+
+    // Internal service routines
+    Json get_master(Json args);
+};
+
+} // namespace paxos
+
+#endif
