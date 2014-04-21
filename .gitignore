@@ -6,5 +6,8 @@ paxos.cc
 paxos.hh
 network.cc
 network.hh
+client.hh
 main.cc
 main
+*.jpeg
+*_persist

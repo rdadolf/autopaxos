@@ -48,6 +48,10 @@ void modcomm_fd::initialize( tamer::fd cfd )
   mpfd_.initialize(cfd);
 }
 
+void modcomm_fd::clear() {
+  mpfd_.clear();
+}
+
 tamed void modcomm_fd::call( Json msg, tamer::event<Json> ev )
 {
   tvars {

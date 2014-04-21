@@ -1,10 +1,6 @@
 .PHONY: default test
-
-CPP_TEMPS= main.cc paxos.cc network.cc
-HPP_TEMPS= paxos.hh phat_api.hh phat_server.hh puppet.hh network.hh
+	
 .SECONDARY:$(CPP_TEMPS) $(HPP_TEMPS)
-
-default: server_driver client_driver paxos_driver puppet
 
 # All manner of FLAGS
 OS_STYLE=$(shell uname -s)
@@ -51,8 +47,10 @@ UTIL_OBJ=network.o
 CLIENT_HDR=phat_api.hh puppet.hh rpc_msg.hh log.hh network.hh
 SERVER_HDR=phat_server.hh puppet.hh paxos.hh rpc_msg.hh log.hh network.hh
 
+all: main
+
 paxos.o: paxos.cc paxos.hh rpc_msg.hh network.hh $(MPRPC_HDR) $(MPRPC_OBJ) $(MPRPC_SRC)
-main.o: main.cc paxos.o $(UTIL_OBJ) $(MPRPC_OBJ) $(MPRPC_SRC) $(MPRPC_HDR)
+main.o: main.cc client.hh paxos.o $(UTIL_OBJ) $(MPRPC_OBJ) $(MPRPC_SRC) $(MPRPC_HDR)
 main: main.o paxos.o $(UTIL_OBJ) $(MPRPC_OBJ) $(MPRPC_SRC) $(MPRPC_HDR)
 	$(CXX) paxos.o $(UTIL_OBJ) $(MPRPC_OBJ) $< -o main $(LDFLAGS)
 
