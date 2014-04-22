@@ -113,23 +113,21 @@ tamed void Paxos_Client::make_request(Json msg, tamer::event<Json> ev) {
     tvars { 
         RPC_Msg req,ret;
         tamer::rendezvous<bool> r;
-        bool to;
         bool done(false);
     }
     do {
         INFO() << "making request to " << master_;
         req = RPC_Msg(Json::array("request",msg));
-        mpfd_.call(req,r.make_event(false,ret.json()));
-        tamer::at_delay(request_timeout_,r.make_event(true));
-        twait(r,to);
+        mpfd_.call(req,r.make_event(true,ret.json()));
+        tamer::at_delay(request_timeout_,r.make_event(false));
+        twait(r,done);
         r.clear();
-        if (to) { // request timed out 
+        if (!done) { // request timed out 
             INFO () << "client request timed out";
             twait { get_master(make_event()); }
-        }
-        INFO() << ret.content();
-        // exit(1);
+        } 
     } while(!done);
+    INFO() << "client finished request: " << ret.content();
     swap(*ev.result_pointer(),ret.content());
     ev.unblock();
 }

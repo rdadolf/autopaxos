@@ -297,8 +297,8 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req,Json v) {
         me_->master_ = v[2].as_i();
         me_->epoch_ = v[1].as_i() + 1;
     // } else (v[0].as_s() == "file") {
+        INFO() << "I, "<< me_->paxos_port_ << ", think master is : " << me_->master_;
     }}
-    INFO() << "I, "<< me_->paxos_port_ << ", think master is : " << me_->master_;
     res = RPC_Msg(Json::array(DECIDED,"ACK"),req);
     persist();
     mpfd.write(res);

@@ -33,6 +33,8 @@ tamed void run() {
         Json config = Json::make_array();
         Paxos_Client* client;
         Json req,res;
+        tamer::rendezvous<bool> r;
+        bool to;
     }
     for (i = 0; i < n; ++i) 
         config.push_back(Json::array(server_port_s + i, paxos_port_s + i));
@@ -51,8 +53,11 @@ tamed void run() {
         }
     
     req = Json::array("test message",1,2,3,Json::null,Json::array());
-    twait { client->make_request(req,make_event(res)); }
-    INFO () << "decided : " << res;
+    client->make_request(req,r.make_event(false,res));
+    tamer::at_delay(15,r.make_event(true));
+    twait(r,to);
+    if (to)
+        INFO () << "main timed out";
     tamer::break_loop();
 }
 
