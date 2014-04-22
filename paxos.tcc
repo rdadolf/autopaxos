@@ -83,6 +83,7 @@ tamed void Paxos_Proposer::run_instance(Json _v,tamer::event<Json> done) {
     set_vc(_v);
     INFO() << "starting instance";;
 start:
+    v_o = Json::array();
     if(v_c[1].as_i() != me_->epoch_) { // replica is no longer master: shouldn't be sending 
         assert(v_c[1].as_i() < me_->epoch_);
         INFO() << "proposer's epoch number is behind in run_instance";
@@ -112,7 +113,7 @@ start:
     
     req = RPC_Msg(Json::array(DECIDED,v_c[1].as_i(),n_p,v_o));
     send_to_all(req);
-    INFO() << "decided" << req.content();;
+    INFO() << "decided " << req.content();;
 done:
     *done.result_pointer() = v_o;
     done.unblock();
@@ -161,10 +162,10 @@ tamed void Paxos_Proposer::accept(int n, tamer::event<> done) {
         RPC_Msg req;
         std::vector<int>::size_type i;
     }
-    INFO() << "accept";;
     n_p = std::max(n_o,n_p);
     persist();
     req = RPC_Msg(Json::array(ACCEPT,v_c[1].as_i(),n_p,v_o));
+    INFO() << "send_accept " << uid_ << ": " << req.content();
 
     for (i = 0; i < ports.size(); ++i)
         mpfd[i].call(req,r.make_event(i,res[i].json()));
@@ -218,6 +219,8 @@ tamed void Paxos_Acceptor::handle_request(tamer::fd cfd) {
             INFO() << "bad RPC: " << req.content();;
             break;
         }
+        if (me_->stopped_)
+            continue;
         if (me_->epoch_ != req.content()[1].as_i()) {// ignore request; proposer should time out and realize it's behind
             INFO() << "proposer's epoch number is behind in acceptor";
             continue;
@@ -226,20 +229,20 @@ tamed void Paxos_Acceptor::handle_request(tamer::fd cfd) {
         me_->elect_me_.make_event(false).trigger();
         switch(req.content()[0].as_i()) {
             case PREPARE:
-                INFO() << "prepare: " << req.content();;
+                INFO() << "receive_prepare " << port << " : " << req.content();;
                 assert(req.content().size() == 3);
                 n = req.content()[2].as_i();
                 prepare(mpfd,req,n);
                 break;
             case ACCEPT:
-                INFO() << "accept: " << req.content();;
+                INFO() << "receive_accept " << port << " : " << req.content();;
                 assert(req.content().size() == 4 && req.content()[3].is_a());
                 n = req.content()[2].as_i();
                 v = req.content()[3];
                 accept(mpfd,req,n,v);
                 break;
             case DECIDED:
-                INFO() << "decided: " << req.content();;
+                INFO() << "receive_decided " << port << " : " << req.content();;
                 assert(req.content().size() == 4 && req.content()[3].is_a());
                 v = req.content()[3];
                 decided(mpfd,req,v);
@@ -264,6 +267,7 @@ tamed void Paxos_Acceptor::prepare(modcomm_fd& mpfd, RPC_Msg& req,int n) {
     n_l = std::max(n_l,n);
     res = RPC_Msg(Json::array(PREPARED,n_a,v_a),req);
     persist();
+    INFO() << "prepared " << port << ": " << res.content();
     mpfd.write(res);
 }
 
@@ -275,7 +279,7 @@ tamed void Paxos_Acceptor::accept(modcomm_fd& mpfd, RPC_Msg& req, int n, Json v)
         n_l = n_a = n;
         v_a = v;
     }
-    
+        
     res = RPC_Msg(Json::array(ACCEPTED,n_a),req);
     persist();
     mpfd.write(res);
@@ -286,15 +290,15 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req,Json v) {
         RPC_Msg res; 
     }
     v_a = Json::make_array();
+    n_a = 0;
     if (v[0].is_s()) {
     if (v[0].as_s() == "master") {
         assert(v[1].is_i() && v[2].is_i());
         me_->master_ = v[2].as_i();
         me_->epoch_ = v[1].as_i() + 1;
     // } else (v[0].as_s() == "file") {
+        INFO() << "I, "<< me_->paxos_port_ << ", think master is : " << me_->master_;
     }}
-    INFO() << "I, "<< me_->paxos_port_ << ", think I am master: " << me_->i_am_master();
-    INFO () << "master is: " << me_->master_;
     res = RPC_Msg(Json::array(DECIDED,"ACK"),req);
     persist();
     mpfd.write(res);
@@ -302,6 +306,8 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req,Json v) {
 
 tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
     tvars { RPC_Msg res; }
+    if (me_->epoch_ != req.content()[1].as_i())
+        me_->epoch_ = req.content()[1].as_i();
     res = RPC_Msg(Json::array("ACK"),req);
     mpfd.write(res);
 }
@@ -357,11 +363,13 @@ tamed void Paxos_Server::listen_for_heartbeats() {
     bool em;
     Json j;
   }
-  // an event is considered empty if nothing is waiting on it...
+  
   while (1) {
     elect_me_.clear();
     tamer::at_delay_msec(master_timeout_,elect_me_.make_event(true));
     twait(elect_me_,em);
+    if (stopped_)
+        continue;
     if (em) {
       elect_me_.clear();
       INFO() << "master timed out " << paxos_port_;
@@ -396,7 +404,8 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
 {
   tvars {
     modcomm_fd mpfd;
-    RPC_Msg request, reply, res;
+    RPC_Msg request, reply;
+    Json res;
   }
 
   mpfd.initialize(client_fd);
@@ -404,10 +413,15 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
     twait{ mpfd.read_request(tamer::make_event(request.json())); }
     if(!mpfd)
       break;
+    if (stopped_)
+        continue;
     if( request.validate() ) {
       INFO() << "paxos server got: " << request.content();
       if( request.content()[0]=="get_master" ) {
-        reply = RPC_Msg( get_master(request.content()), request );
+        reply = RPC_Msg( get_master(), request );
+      } else if( request.content()[0]=="request" ) {
+        twait { receive_request(request.content()[1],make_event(res)); }
+        reply = RPC_Msg(res,request);
       // } else if( request.content()[0]=="<other thing here>" ) {
       } else {
         reply = RPC_Msg( Json::array(String("NACK")), request );
@@ -430,12 +444,40 @@ tamed void Paxos_Server::elect_me(tamer::event<Json> ev) {
 
 tamed void Paxos_Server::beating_heart() {
     while (i_am_master()) {
-        twait { proposer_->send_heartbeat(make_event()); }
-        INFO() << "Paxos_Server sending heartbeat";
-        twait { tamer::at_delay_msec(heartbeat_freq_, make_event()); }
+        if (!stopped_) {
+            twait { proposer_->send_heartbeat(make_event()); }
+            INFO() << "Paxos_Server sending heartbeat " << paxos_port_;
+        }
+        twait { tamer::at_delay(heartbeat_freq_, make_event()); }
     }
 }
 
-Json Paxos_Server::get_master(Json args) {
-    return Json::null;
+Json Paxos_Server::get_master() {
+    if( i_am_master() ) {
+        return Json::array(String("ACK"));
+    } else {
+        int port = -1;
+        for (int i = 0; i < config_.size(); ++i) {
+            if (config_[i][1].as_i() == master_) {
+                port = config_[i][0].as_i(); 
+                break;
+            }
+        } 
+        return Json::array(String("NACK"),String("NOT_MASTER"),String("localhost"),port);
+    }
+}
+
+tamed void Paxos_Server::receive_request(Json args, tamer::event<Json> ev) {
+    tvars { 
+        Json req;
+    }
+    INFO() << "receive_request";
+    if (!i_am_master()) {
+        req = get_master();
+        swap(*ev.result_pointer(),req);
+    } else {
+        req = Json::array("blah",epoch_,args);
+        twait { proposer_->run_instance(req,make_event(*ev.result_pointer())); }
+    }
+    ev.unblock();
 }

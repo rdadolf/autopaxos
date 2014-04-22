@@ -49,6 +49,7 @@ public:
   }
 
   void initialize( tamer::fd cfd );
+  void clear();
   tamed void call( Json msg, tamer::event<Json> ev );
   inline void write(Json msg);
   tamed void write( Json msg, tamer::event<> ev );

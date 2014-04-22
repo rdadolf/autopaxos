@@ -204,6 +204,7 @@ private:
     int heartbeat_freq_;
     int epoch_; // everything is going to start in epoch 0; once a master is elected, it moves to epoch 1
     Json config_;
+    bool stopped_ = false;
 
     // Paxos Stuff
     int paxos_port_;
@@ -221,19 +222,29 @@ public:
     bool i_am_master() {
         return master_ == paxos_port_;
     }
+    void start() {
+        stopped_ = false;
+    }
+    void stop() {
+        stopped_ = true;
+    }
+    int who_is_master() {
+        return master_;
+    }
 
     tamed void run_master_server();
     tamed void paxos_init(tamer::event<> ev);
     tamed void listen_for_heartbeats();
     tamed void handle_new_connections();
     tamed void read_and_dispatch(tamer::fd client);
+    tamed void receive_request(Json args, tamer::event<Json> ev);
 
     // Paxos functions
     tamed void elect_me(tamer::event<Json> ev);
     tamed void beating_heart();
 
     // Internal service routines
-    Json get_master(Json args);
+    Json get_master();
 };
 
 } // namespace paxos

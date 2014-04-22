@@ -1,0 +1,133 @@
+#include "mpfd.hh"
+#include "rpc_msg.hh"
+#include "log.hh"
+#include "network.hh"
+
+class Paxos_Client {
+private:
+    tamer::fd cfd_;
+    modcomm_fd mpfd_;
+    Json config_;
+    int request_timeout_;
+    int master_;
+public:
+    Paxos_Client(Json config): config_(config),request_timeout_(2),master_(15800) {
+    }
+
+    // client functions
+    tamed void client_init(const char* hostname, int port,
+                            struct in_addr hostip,tamer::event<> done);
+    tamed void get_master(tamer::event<> ev);
+    tamed void make_request(Json msg, tamer::event<Json> ev);
+    tamed void wait_for_notifications(tamer::event<> ev);
+
+};
+
+tamed void Paxos_Client::client_init(const char* hostname, int port, 
+                                    struct in_addr hostip,tamer::event<> done) {
+
+    tvars {
+        int s = 100;
+    }
+    // lookup hostname address
+    {
+        in_addr_t a = hostname ? inet_addr(hostname) : htonl(INADDR_LOOPBACK);
+        if (a != INADDR_NONE)
+            hostip.s_addr = a;
+        else {
+            struct hostent* hp = gethostbyname(hostname);
+            if (hp == NULL || hp->h_length != 4 || hp->h_addrtype != AF_INET) {
+                std::cout << "lookup " << hostname << ": " << hstrerror(h_errno) << std::endl;
+                return;
+            }
+            hostip = *((struct in_addr*) hp->h_addr);
+        }
+    }
+
+    twait { tamer::tcp_connect(hostip, port, make_event(cfd_)); }
+    while (!cfd_) {
+        INFO() << "delaying to connect to " << port << ": " << s;
+        twait { tamer::at_delay_msec(s,make_event()); }
+        twait { tamer::tcp_connect(hostip, port, make_event(cfd_)); }
+        if (s <= 10000)
+            s *= 2;
+    }
+    mpfd_.initialize(cfd_);
+    done();
+}
+
+tamed void Paxos_Client::get_master(tamer::event<> ev)
+{
+  tvars {
+    RPC_Msg request_master, reply_master;
+    Json master_info;
+    struct in_addr hostip;
+    bool master_known=false;
+    tamer::rendezvous<bool> r;
+    bool to;
+  }
+
+  INFO() << "get_master called";
+
+  do {
+    INFO() << "Attempting to contact master " << master_;
+    mpfd_.clear();
+    twait { client_init("localhost",master_,hostip,make_event()); }
+
+    request_master = RPC_Msg(Json::array(String("get_master")));
+
+    do {
+        // mpfd_call(mpfd_,request_master, reply_master,r.make_event(false));
+        mpfd_.call(request_master,r.make_event(false,reply_master.json()));
+        tamer::at_delay(request_timeout_,r.make_event(true));
+        twait(r,to);
+        if (to)
+            INFO() << "retrying get_master";
+        r.clear();
+    } while(to);
+    // FIXME: validate
+    INFO() << reply_master.content();
+    if( reply_master.content()[0].as_s()=="ACK" ) {
+      master_known = true;
+      // master_ data already set.
+    } else if( reply_master.content()[0].as_s()=="NACK" ) {
+      master_known = false;
+      if( reply_master.content()[1].as_s()=="NOT_MASTER" ) {
+        /*if( reply_master.content()[2].is_s() ) {
+          get_ip_address( reply_master.content()[2].as_s().c_str(), master_.ip );
+        } else if( reply_master.content()[2].is_i() ) {
+          get_ip_address( reply_master.content()[2].as_i(), master_.ip );
+        }*/
+        master_ = reply_master.content()[3].as_i();
+      }
+      
+    }
+  } while( !master_known );
+
+  INFO() << "Master identified";
+
+  ev();
+}
+
+tamed void Paxos_Client::make_request(Json msg, tamer::event<Json> ev) {
+    tvars { 
+        RPC_Msg req,ret;
+        tamer::rendezvous<bool> r;
+        bool done(false);
+    }
+    do {
+        INFO() << "making request to " << master_;
+        req = RPC_Msg(Json::array("request",msg));
+        mpfd_.call(req,r.make_event(true,ret.json()));
+        tamer::at_delay(request_timeout_,r.make_event(false));
+        twait(r,done);
+        r.clear();
+        if (!done) { // request timed out 
+            INFO () << "client request timed out";
+            twait { get_master(make_event()); }
+        } 
+    } while(!done);
+    INFO() << "client finished request: " << ret.content();
+    swap(*ev.result_pointer(),ret.content());
+    ev.unblock();
+}

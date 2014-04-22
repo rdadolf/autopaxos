@@ -51,7 +51,7 @@ COMMON_OBJ=network.o
 COMMON_HDR=log.hh network.hh
 
 paxos.o: paxos.cc paxos.hh rpc_msg.hh $(COMMON_HDR) $(MPRPC_HDR)
-main.o: main.cc paxos.hh $(COMMON_HDR) $(MPRPC_HDR)
+main.o: main.cc paxos.hh client.hh $(COMMON_HDR) $(MPRPC_HDR)
 main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $< -o main $(LDFLAGS)
 
