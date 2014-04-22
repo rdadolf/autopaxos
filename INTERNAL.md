@@ -18,3 +18,5 @@ ADD:
 - fake client requests (omniscient injection)
 - timing measurment
 - bandwidth measurement (modcomm)
+- fake server death (state reset)
+- server start event

@@ -1,6 +1,6 @@
 # Autopaxos
 
-A distributive consensus protocol which adapts to network conditions.
+A distributed consensus protocol which adapts to network conditions.
 
 ## Driving Hypothesis:
 

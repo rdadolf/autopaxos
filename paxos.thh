@@ -201,6 +201,7 @@ private:
     int listen_port_;
     int master_;
     int master_timeout_;
+    int heartbeat_freq_;
     int epoch_; // everything is going to start in epoch 0; once a master is elected, it moves to epoch 1
     Json config_;
 

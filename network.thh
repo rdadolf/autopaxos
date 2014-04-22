@@ -36,6 +36,7 @@ class modcomm_fd {
 private:
   static unsigned int delay_;
   msgpack_fd mpfd_;
+  static uint64_t data_transferred_; // #FIXME: currently a packet counter
 public:
   modcomm_fd(){}
   modcomm_fd(tamer::fd cfd) {
@@ -55,6 +56,8 @@ public:
 
   bool operator!() { return !((bool)mpfd_); }
   operator bool() { return (bool)mpfd_; }
+
+  static uint64_t data_transferred() { return data_transferred_; }
 };
 
 inline void modcomm_fd::write(Json msg) {

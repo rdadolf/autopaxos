@@ -315,7 +315,8 @@ int rand_int(double min, double max) {
 Paxos_Server::Paxos_Server(int port, int paxos, Json config) {
     listen_port_ = port;
     master_ = -1;
-    master_timeout_ = 5;
+    master_timeout_ = MASTER_TIMEOUT; // FIXME
+    heartbeat_freq_ = HEARTBEAT_FREQ; // FIXME (also, was MASTER_TIMEOUT/2)
     epoch_ = 0;
     config_ = config;
     paxos_port_ = paxos;
@@ -325,9 +326,9 @@ Paxos_Server::Paxos_Server(int port, int paxos, Json config) {
 tamed void Paxos_Server::run_master_server() {
     tvars { Json j; }
     INFO () << "starting paxos server";
-
+    // FIXME: paxos sync start event wait goes here
     twait { paxos_init(make_event()); }
-    twait { tamer::at_delay(rand_int(0,master_timeout_),make_event()); }
+    twait { tamer::at_delay_msec(rand_int(0,master_timeout_),make_event()); }
     if (master_ < 0) 
       twait { elect_me(make_event(j)); }
     listen_for_heartbeats();
@@ -359,7 +360,7 @@ tamed void Paxos_Server::listen_for_heartbeats() {
   // an event is considered empty if nothing is waiting on it...
   while (1) {
     elect_me_.clear();
-    tamer::at_delay(master_timeout_,elect_me_.make_event(true));
+    tamer::at_delay_msec(master_timeout_,elect_me_.make_event(true));
     twait(elect_me_,em);
     if (em) {
       elect_me_.clear();
@@ -431,7 +432,7 @@ tamed void Paxos_Server::beating_heart() {
     while (i_am_master()) {
         twait { proposer_->send_heartbeat(make_event()); }
         INFO() << "Paxos_Server sending heartbeat";
-        twait { tamer::at_delay(master_timeout_ / 2, make_event()); }
+        twait { tamer::at_delay_msec(heartbeat_freq_, make_event()); }
     }
 }
 
