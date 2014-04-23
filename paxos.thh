@@ -198,7 +198,6 @@ friend class paxos::Paxos_Acceptor;
 private: 
     tamer::rendezvous<bool> elect_me_;
     tamer::rendezvous<> master_change_;
-    typedef enum { FILE=1, DIR } Filetype_t;
     int listen_port_;
     int master_;
     int master_timeout_;
@@ -209,7 +208,6 @@ private:
 
     // Paxos Stuff
     int paxos_port_;
-    msgpack_fd paxm_mpfd_;
     Json paxi_;
     paxos::Paxos_Proposer* proposer_;
     paxos::Paxos_Acceptor* acceptor_;

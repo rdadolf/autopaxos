@@ -75,7 +75,7 @@ tamed void Paxos_Proposer::run_instance(Json _v,tamer::event<Json> done) {
         bool to;
     }
     set_vc(_v);
-    INFO() << "starting instance";;
+    INFO() << "starting instance " << uid_;;
 start:
     v_o = Json::array();
     if(v_c[1].as_i() != me_->epoch_) { // replica is no longer master: shouldn't be sending 
@@ -126,7 +126,7 @@ tamed void Paxos_Proposer::propose(int n, Json v, tamer::event<> done) {
     persist();
     n_o = a = 0;
     req = RPC_Msg(Json::array(PREPARE,v_c[1].as_i(),n_p));
-    INFO() << "propose: " << req.content();;
+    INFO() << "propose "<< uid_ <<": " << req.content();;
 
     for (i = 0; i < ports.size(); ++i)
         mpfd[i].call(req,r.make_event(i,res[i].json()));
@@ -217,7 +217,9 @@ tamed void Paxos_Acceptor::handle_request(tamer::fd cfd) {
         if (me_->stopped_)
             continue;
         if (me_->epoch_ != req.content()[1].as_i()) {// ignore request; proposer should time out and realize it's behind
-            INFO() << "proposer's epoch number is behind in acceptor";
+            if (me_->epoch_ < req.content()[1].as_i()) // if I am behind, catch me up
+                me_->epoch_  = req.content()[1].as_i();
+            INFO() << "proposer's epoch number is behind in acceptor " << port << ": " << req.content();
             continue;
         }
         // heartbeat
@@ -303,8 +305,10 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req) {
 
 tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
     tvars { RPC_Msg res; }
-    if (me_->epoch_ != req.content()[1].as_i())
+    if (me_->epoch_ != req.content()[1].as_i()) {
+        INFO() << "epoch behind in " << port << ": changing to " << req.content()[1].as_i();
         me_->epoch_ = req.content()[1].as_i();
+    }
     res = RPC_Msg(Json::array("ACK"),req);
     mpfd.write(res);
 }
