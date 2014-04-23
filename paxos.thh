@@ -187,7 +187,7 @@ public:
     tamed void handle_request(tamer::fd cfd);
     tamed void prepare(modcomm_fd& mpfd, RPC_Msg& req,int n);
     tamed void accept(modcomm_fd& mpfd, RPC_Msg& req, int n, Json v);
-    tamed void decided(modcomm_fd& mpfd, RPC_Msg& req,Json v);
+    tamed void decided(modcomm_fd& mpfd, RPC_Msg& req);
     tamed void receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req);
 };
 
@@ -197,6 +197,7 @@ friend class paxos::Paxos_Proposer;
 friend class paxos::Paxos_Acceptor;
 private: 
     tamer::rendezvous<bool> elect_me_;
+    tamer::rendezvous<> master_change_;
     typedef enum { FILE=1, DIR } Filetype_t;
     int listen_port_;
     int master_;
@@ -232,7 +233,7 @@ public:
         return master_;
     }
 
-    tamed void run_master_server();
+    tamed void run_server();
     tamed void paxos_init(tamer::event<> ev);
     tamed void listen_for_heartbeats();
     tamed void handle_new_connections();
@@ -241,7 +242,8 @@ public:
 
     // Paxos functions
     tamed void elect_me(tamer::event<Json> ev);
-    tamed void beating_heart();
+    tamed void listen_for_master_change();
+    tamed void beating_heart(tamer::event<> ev);
 
     // Internal service routines
     Json get_master();

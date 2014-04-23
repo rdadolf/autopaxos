@@ -2,12 +2,11 @@ log.txt
 *.DS_Store
 *.o
 *.dSYM
-paxos.cc
-paxos.hh
-network.cc
-network.hh
-client.hh
-main.cc
 main
+nnodes
 *.jpeg
 *_persist
+.deps
+.deps/*
+commands
+commands/*

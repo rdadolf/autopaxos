@@ -59,16 +59,10 @@ tamed void Paxos_Proposer::client_init(const char* hostname, int port, tamer::fd
 tamed void Paxos_Proposer::send_to_all(RPC_Msg& req){
     tvars {
         std::vector<int>::size_type i;
-        tamer::rendezvous<int> r;
-        int ret;
+        tamer::rendezvous<> r;
     }
     for (i = 0; i < ports.size(); ++i)
-        mpfd[i].call(req,r.make_event(i,res[i].json()));
-/*
-    for (i = 0; i < (unsigned)(f + 1); ++i)
-        twait(r,ret);
-    
-    done();*/
+        mpfd[i].call(req,r.make_event(res[i].json()));
 }
 
 tamed void Paxos_Proposer::run_instance(Json _v,tamer::event<Json> done) {
@@ -111,9 +105,10 @@ start:
         goto start;
     }
     
-    req = RPC_Msg(Json::array(DECIDED,v_c[1].as_i(),n_p,v_o));
+    req = RPC_Msg(Json::array(DECIDED,v_c[1].as_i(),n_p));
+
     send_to_all(req);
-    INFO() << "decided " << req.content();;
+    INFO() << "decided " << v_o;;
 done:
     *done.result_pointer() = v_o;
     done.unblock();
@@ -182,7 +177,7 @@ tamed void Paxos_Proposer::accept(int n, tamer::event<> done) {
 }
 
 tamed void Paxos_Proposer::send_heartbeat(tamer::event<> done) {
-    tvars { RPC_Msg req; }
+    tvars { RPC_Msg req; tamer::event<> e;}
     req = RPC_Msg(Json::array(HEARTBEAT,me_->epoch_));
     send_to_all(req);
     done();
@@ -243,9 +238,8 @@ tamed void Paxos_Acceptor::handle_request(tamer::fd cfd) {
                 break;
             case DECIDED:
                 INFO() << "receive_decided " << port << " : " << req.content();;
-                assert(req.content().size() == 4 && req.content()[3].is_a());
-                v = req.content()[3];
-                decided(mpfd,req,v);
+                assert(req.content().size() == 3);
+                decided(mpfd,req);
                 break;
             case HEARTBEAT:
                 INFO() << "heartbeat: acceptor " << port;
@@ -279,16 +273,18 @@ tamed void Paxos_Acceptor::accept(modcomm_fd& mpfd, RPC_Msg& req, int n, Json v)
         n_l = n_a = n;
         v_a = v;
     }
-        
+
     res = RPC_Msg(Json::array(ACCEPTED,n_a),req);
     persist();
     mpfd.write(res);
 }
 
-tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req,Json v) {
+tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req) {
     tvars { 
-        RPC_Msg res; 
+        RPC_Msg res;
+        Json v;
     }
+    v = v_a;
     v_a = Json::make_array();
     n_a = 0;
     if (v[0].is_s()) {
@@ -296,8 +292,9 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req,Json v) {
         assert(v[1].is_i() && v[2].is_i());
         me_->master_ = v[2].as_i();
         me_->epoch_ = v[1].as_i() + 1;
-    // } else (v[0].as_s() == "file") {
+        me_->master_change_.make_event().trigger();
         INFO() << "I, "<< me_->paxos_port_ << ", think master is : " << me_->master_;
+    // } else (v[0].as_s() == "file") {
     }}
     res = RPC_Msg(Json::array(DECIDED,"ACK"),req);
     persist();
@@ -327,9 +324,9 @@ Paxos_Server::Paxos_Server(int port, int paxos, Json config) {
     config_ = config;
     paxos_port_ = paxos;
 
-    run_master_server();
+    run_server();
 }
-tamed void Paxos_Server::run_master_server() {
+tamed void Paxos_Server::run_server() {
     tvars { Json j; }
     INFO () << "starting paxos server";
     // FIXME: paxos sync start event wait goes here
@@ -338,6 +335,7 @@ tamed void Paxos_Server::run_master_server() {
     if (master_ < 0) 
       twait { elect_me(make_event(j)); }
     listen_for_heartbeats();
+    listen_for_master_change();
     handle_new_connections();
 }
 
@@ -373,6 +371,7 @@ tamed void Paxos_Server::listen_for_heartbeats() {
     if (em) {
       elect_me_.clear();
       INFO() << "master timed out " << paxos_port_;
+      master_ = -1;
       twait { elect_me(tamer::make_event(j)); }
     } else 
         INFO() << "got heartbeat " << paxos_port_;
@@ -413,15 +412,23 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
     twait{ mpfd.read_request(tamer::make_event(request.json())); }
     if(!mpfd)
       break;
-    if (stopped_)
-        continue;
     if( request.validate() ) {
+        if (stopped_ && request.content()[0] != "start")
+            continue;
       INFO() << "paxos server got: " << request.content();
       if( request.content()[0]=="get_master" ) {
         reply = RPC_Msg( get_master(), request );
       } else if( request.content()[0]=="request" ) {
         twait { receive_request(request.content()[1],make_event(res)); }
         reply = RPC_Msg(res,request);
+      } else if( request.content()[0]=="stop" ) {
+        stopped_ = true;
+        reply = RPC_Msg(Json::array("ACK"),request);
+        INFO() << "server " << listen_port_ << " stopping.";
+      } else if( request.content()[0]=="start" ) {
+        stopped_ = false;
+        reply = RPC_Msg(Json::array("ACK"),request);
+        INFO() << "server " << listen_port_ << " starting.";
       // } else if( request.content()[0]=="<other thing here>" ) {
       } else {
         reply = RPC_Msg( Json::array(String("NACK")), request );
@@ -438,18 +445,26 @@ tamed void Paxos_Server::elect_me(tamer::event<Json> ev) {
     v = Json::array("master",epoch_,paxos_port_);
     INFO() << "Elect: "<< paxos_port_;
     twait {proposer_->run_instance(v,make_event(*ev.result_pointer())); }
-    beating_heart();
     ev.unblock();
 }
 
-tamed void Paxos_Server::beating_heart() {
+tamed void Paxos_Server::listen_for_master_change() {
+    while(1) {
+        twait(master_change_);
+        master_change_.clear();
+        twait { beating_heart(make_event()); }
+    }
+}
+
+tamed void Paxos_Server::beating_heart(tamer::event<> ev) {
     while (i_am_master()) {
         if (!stopped_) {
             twait { proposer_->send_heartbeat(make_event()); }
             INFO() << "Paxos_Server sending heartbeat " << paxos_port_;
         }
-        twait { tamer::at_delay(heartbeat_freq_, make_event()); }
+        twait { tamer::at_delay_msec(heartbeat_freq_, make_event()); }
     }
+    ev();
 }
 
 Json Paxos_Server::get_master() {

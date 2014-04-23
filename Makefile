@@ -1,11 +1,3 @@
-.PHONY: default test
-
-CPP_TEMPS= main.cc paxos.cc network.cc
-HPP_TEMPS= paxos.hh network.hh
-.SECONDARY:$(CPP_TEMPS) $(HPP_TEMPS)
-
-default: main
-
 # All manner of FLAGS
 
 ### OS Detection
@@ -39,34 +31,71 @@ endif
 ifeq ($(OS),OSX_POSTMAV)
 CXX=g++ -std=c++11
 endif
-CXXFLAGS=-Wall -g -O2 $(DEBUG) $(DEFINES) -I. -Imprpc -Imprpc/tamer -Imprpc/.deps -include config.h
+CXXFLAGS=-Wall -g -O2 $(DEBUG) $(DEFINES) -I. -I$(DEPSDIR) -Imprpc -Imprpc/tamer -Imprpc/.deps -I$(DEPSDIR) -include config.h
 LIBTAMER=mprpc/tamer/tamer/.libs/libtamer.a
 LIBS=$(LIBTAMER) `$(TAMERC) -l`
 LDFLAGS= -lpthread -lm $(LIBS)
 MPRPC_SRC=mprpc/msgpack.cc mprpc/.deps/mpfd.cc mprpc/string.cc mprpc/straccum.cc mprpc/json.cc mprpc/compiler.cc mprpc/clp.c
 MPRPC_OBJ=mprpc/msgpack.o mprpc/mpfd.o mprpc/string.o mprpc/straccum.o mprpc/json.o mprpc/compiler.o mprpc/clp.c
 MPRPC_HDR=mprpc/msgpack.hh mprpc/.deps/mpfd.hh mprpc/string.hh mprpc/straccum.hh mprpc/json.hh mprpc/compiler.hh mprpc/clp.h
+MPRPC = $(MPRPC_SRC) $(MPRPC_HDR) $(MPRPC_OBJ)
 
 COMMON_OBJ=network.o
-COMMON_HDR=log.hh network.hh
+COMMON_HDR=log.hh $(DEPSDIR)/network.hh
+DEPSDIR := .deps
+COMMAND_DIR := commands
 
-paxos.o: paxos.cc paxos.hh rpc_msg.hh $(COMMON_HDR) $(MPRPC_HDR)
-main.o: main.cc paxos.hh client.hh $(COMMON_HDR) $(MPRPC_HDR)
+default: main nnodes commands
+
+%.o: %.cc $(DEPSDIR)/stamp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+%.o: $(DEPSDIR)/%.cc $(DEPSDIR)/stamp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# Suffix rules for files that need TAMING
+$(DEPSDIR)/%.cc: %.tcc $(DEPSDIR)/stamp
+	$(TAMERC) $(TAMERFLAGS) -o $@ $<
+$(DEPSDIR)/%.hh: %.thh $(DEPSDIR)/stamp
+	$(TAMERC) $(TAMERFLAGS) -o $@ $<
+
 main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $< -o main $(LDFLAGS)
 
-# Suffix rules for files that need TAMING
-%.cc: %.tcc
-	$(TAMERC) $(TAMERFLAGS) -o $@ $<
-%.cc: test/%.tcc
-	$(TAMERC) $(TAMERFLAGS) -o $@ $<
-%.hh: %.thh
-	$(TAMERC) $(TAMERFLAGS) -o $@ $<
+# nnodes.o: nnodes.cc paxos.hh $(COMMON_HDR) $(MPRPC_HDR)
+nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
+	$(CXX) paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
+
+commands: stop_server start_server
+
+%_server: $(DEPSDIR)/server_command.cc $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR) $(COMMAND_DIR)/stamp
+	$(CXX) $(CXXFLAGS) $(COMMON_OBJ) -DCOMMAND_TYPE_=\"$*\" $(MPRPC_OBJ) $< -o $(COMMAND_DIR)/$@ $(LDFLAGS)
+
+$(COMMAND_DIR)/stamp:
+	mkdir -p $(dir $@)
+	touch $@
+
+$(DEPSDIR)/stamp:
+	mkdir -p $(dir $@)
+	touch $@
+
+network.o: $(addprefix $(DEPSDIR)/,network.cc network.hh)
+paxos.o: $(addprefix $(DEPSDIR)/,paxos.cc paxos.hh)
+main.o: $(addprefix $(DEPSDIR)/,main.cc paxos.hh client.hh) $(COMMON_HDR)
+nnodes.o: $(addprefix $(DEPSDIR)/,nnodes.cc paxos.hh) $(COMMON_HDR)
 
 # Cleanup
-clean:
-	rm -f main *.o *_persist log.txt
+persist_clean:
+	rm -f *_persist log.txt
+clean: persist_clean
+	rm -f main nnodes *.o
 	rm -rf *.dSYM
-	rm -f $(CPP_TEMPS)
-	rm -f $(HPP_TEMPS)
+	rm -rf $(DEPSDIR)
+	rm -rf $(COMMAND_DIR)
 	rm -f test/*.hh
+
+always:
+	@:
+
+.PHONY: default persist_clean clean always
+.PRECIOUS: $(DEPSDIR)/%.cc $(DEPSDIR)/%.hh
