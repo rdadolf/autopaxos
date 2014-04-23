@@ -69,7 +69,7 @@ public:
 
     gettimeofday(&tv, 0);
     snprintf(prefix, 60, "%ld.%06d [%d:%s:%d] %s: ",
-      tv.tv_sec, tv.tv_usec, getpid(), file_, line_, mode_);
+      tv.tv_sec, (int)tv.tv_usec, getpid(), file_, line_, mode_);
     final_buffer += prefix;
     final_buffer += buffer_;
     final_buffer += "\n";
