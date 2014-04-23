@@ -6,7 +6,7 @@
 class Paxos_Client {
 private:
     tamer::fd cfd_;
-    modcomm_fd mpfd_;
+    msgpack_fd mpfd_;
     Json config_;
     int request_timeout_;
     int master_;
@@ -65,6 +65,7 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
     bool master_known=false;
     tamer::rendezvous<bool> r;
     bool to;
+    int i;
   }
 
   INFO() << "get_master called";
@@ -84,7 +85,7 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
             // select another port to contact
             for (i = 0; i < config_.size(); ++i) 
                 if (config_[1].as_i() != master_)
-                    master_ = config_[1].as_i();
+                    master_ = config_[0].as_i();
         }
         r.clear();
     } while(to);

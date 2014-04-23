@@ -406,7 +406,7 @@ tamed void Paxos_Server::handle_new_connections()
 tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
 {
   tvars {
-    modcomm_fd mpfd;
+    msgpack_fd mpfd;
     RPC_Msg request, reply;
     Json res;
   }
