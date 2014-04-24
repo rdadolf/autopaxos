@@ -6,7 +6,7 @@
 class Paxos_Client {
 private:
     tamer::fd cfd_;
-    modcomm_fd mpfd_;
+    msgpack_fd mpfd_;
     Json config_;
     int request_timeout_;
     int master_;
@@ -65,6 +65,7 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
     bool master_known=false;
     tamer::rendezvous<bool> r;
     bool to;
+    int i;
   }
 
   INFO() << "get_master called";
@@ -72,17 +73,20 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
   do {
     INFO() << "Attempting to contact master " << master_;
     mpfd_.clear();
-    twait { client_init("localhost",master_,hostip,make_event()); }
-
-    request_master = RPC_Msg(Json::array(String("get_master")));
 
     do {
-        // mpfd_call(mpfd_,request_master, reply_master,r.make_event(false));
+        twait { client_init("localhost",master_,hostip,make_event()); }
+        request_master = RPC_Msg(Json::array(String("get_master")));
         mpfd_.call(request_master,r.make_event(false,reply_master.json()));
         tamer::at_delay(request_timeout_,r.make_event(true));
         twait(r,to);
-        if (to)
+        if (to) {
             INFO() << "retrying get_master";
+            // select another port to contact
+            for (i = 0; i < config_.size(); ++i) 
+                if (config_[1].as_i() != master_)
+                    master_ = config_[0].as_i();
+        }
         r.clear();
     } while(to);
     // FIXME: validate

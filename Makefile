@@ -31,7 +31,7 @@ endif
 ifeq ($(OS),OSX_POSTMAV)
 CXX=g++ -std=c++11
 endif
-CXXFLAGS=-Wall -g -O2 $(DEBUG) $(DEFINES) -I. -I$(DEPSDIR) -Imprpc -Imprpc/tamer -Imprpc/.deps -I$(DEPSDIR) -include config.h
+CXXFLAGS=-Wall -g -O2 $(DEBUG) $(DEFINES) -I. -I$(DEPSDIR) -Imprpc -Imprpc/tamer -Imprpc/.deps -include config.h
 LIBTAMER=mprpc/tamer/tamer/.libs/libtamer.a
 LIBS=$(LIBTAMER) `$(TAMERC) -l`
 LDFLAGS= -lpthread -lm $(LIBS)
@@ -62,12 +62,12 @@ $(DEPSDIR)/%.hh: %.thh $(DEPSDIR)/stamp
 main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $< -o main $(LDFLAGS)
 
-# nnodes.o: nnodes.cc paxos.hh $(COMMON_HDR) $(MPRPC_HDR)
 nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
 
-commands: stop_server start_server
+commands: stop_server start_server get_master_server
 
+#other types of behavior here
 %_server: $(DEPSDIR)/server_command.cc $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR) $(COMMAND_DIR)/stamp
 	$(CXX) $(CXXFLAGS) $(COMMON_OBJ) -DCOMMAND_TYPE_=\"$*\" $(MPRPC_OBJ) $< -o $(COMMAND_DIR)/$@ $(LDFLAGS)
 

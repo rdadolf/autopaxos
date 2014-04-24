@@ -9,19 +9,32 @@
 #include "network.hh"
 using namespace paxos;
 
+int rand_int(double min, double max) {
+    double ret = ((double) rand() / ((double)RAND_MAX+1)) * (max-min) + min;
+    return (int) ret;
+}
+
 tamed void Paxos_Proposer::proposer_init (tamer::event<> done) {
     tvars {
         struct in_addr hostip;
         std::vector<int>::size_type i;
+        std::vector<int> inds;
+        bool conn;
     }
     assert(ports.size() == mpfd.size());
-    for (i = 0;i < ports.size(); ++i)
-        twait { client_init(hostname.c_str(),ports[i],cfd[i],mpfd[i],hostip,make_event()); }
+    for (i = 0; i < ports.size(); ++i)
+        inds.push_back(i);
+    while (!inds.empty()) {
+        i = rand_int(0,inds.size());
+        twait { client_init(hostname.c_str(),ports[inds[i]],cfd[inds[i]],mpfd[inds[i]],hostip,make_event(conn)); }
+        if (conn)
+            inds.erase(inds.begin() + i);
+    }
     done();
 }
 
 tamed void Paxos_Proposer::client_init(const char* hostname, int port, tamer::fd& cfd, 
-                        modcomm_fd& mpfd, struct in_addr& hostip,tamer::event<> done) {
+                        modcomm_fd& mpfd, struct in_addr& hostip,tamer::event<bool> done) {
 
     tvars {
         int s = 100;
@@ -43,17 +56,19 @@ tamed void Paxos_Proposer::client_init(const char* hostname, int port, tamer::fd
 
     twait { tamer::tcp_connect(hostip, port, make_event(cfd)); }
     while (!cfd) {
-        INFO() << "delaying to connect to " << port << ": " << s;
+        INFO() << uid_ << " delaying to connect to " << port << ": " << s;
         twait { tamer::at_delay_msec(s,make_event()); }
         twait { tamer::tcp_connect(hostip, port, make_event(cfd)); }
-        if (s <= 10000)
+        if (s <= 1000)
             s *= 2;
-        /*INFO() << "connect " << (hostname ? hostname : "localhost")
-                  << ":" << port << ": " << strerror(-cfd.error()) << std::endl;
-        return;*/
+        else {
+            std::cout << "timed out!" <<std::endl;
+            done(false);
+            return;
+        }
     }
     mpfd.initialize(cfd);
-    done();
+    done(true);
 }
 
 tamed void Paxos_Proposer::send_to_all(RPC_Msg& req){
@@ -75,7 +90,7 @@ tamed void Paxos_Proposer::run_instance(Json _v,tamer::event<Json> done) {
         bool to;
     }
     set_vc(_v);
-    INFO() << "starting instance";;
+    INFO() << "starting instance " << uid_;;
 start:
     v_o = Json::array();
     if(v_c[1].as_i() != me_->epoch_) { // replica is no longer master: shouldn't be sending 
@@ -126,14 +141,21 @@ tamed void Paxos_Proposer::propose(int n, Json v, tamer::event<> done) {
     persist();
     n_o = a = 0;
     req = RPC_Msg(Json::array(PREPARE,v_c[1].as_i(),n_p));
-    INFO() << "propose: " << req.content();;
+    INFO() << "propose "<< uid_ <<": " << req.content();;
 
     for (i = 0; i < ports.size(); ++i)
         mpfd[i].call(req,r.make_event(i,res[i].json()));
 
     for (i = 0; i < (unsigned)f + 1; ++i) {
         twait(r,ret);
-        assert(res[ret].content()[0].is_i());
+        if (res[ret].content() == Json::null) {
+            i--;
+            continue;
+        }
+        if (!res[ret].content()[0].is_i()) {
+            INFO() << res[ret].content();
+            abort();
+        }
         if (res[ret].content()[0].as_i() != PREPARED) 
             --i;
         else {
@@ -216,10 +238,11 @@ tamed void Paxos_Acceptor::handle_request(tamer::fd cfd) {
         }
         if (me_->stopped_)
             continue;
-        if (me_->epoch_ != req.content()[1].as_i()) {// ignore request; proposer should time out and realize it's behind
-            INFO() << "proposer's epoch number is behind in acceptor";
+        if (me_->epoch_ > req.content()[1].as_i()) {// ignore request; proposer should time out and realize it's behind
+            INFO() << "proposer's epoch number is behind in acceptor " << port << ": " << req.content();
             continue;
-        }
+        } if (me_->epoch_ < req.content()[1].as_i()) // if I am behind, catch me up
+            me_->epoch_  = req.content()[1].as_i();
         // heartbeat
         me_->elect_me_.make_event(false).trigger();
         switch(req.content()[0].as_i()) {
@@ -305,15 +328,12 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req) {
 
 tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
     tvars { RPC_Msg res; }
-    if (me_->epoch_ != req.content()[1].as_i())
+    if (me_->epoch_ != req.content()[1].as_i()) {
+        INFO() << "epoch behind in " << port << ": changing to " << req.content()[1].as_i();
         me_->epoch_ = req.content()[1].as_i();
+    }
     res = RPC_Msg(Json::array("ACK"),req);
     mpfd.write(res);
-}
-
-int rand_int(double min, double max) {
-    double ret = ((double) rand() / ((double)RAND_MAX+1)) * (max-min) + min;
-    return (int) ret;
 }
 
 // config should have have the form Json::array(Json::array(paxos_server port,paxos_acceptor port))
@@ -404,7 +424,7 @@ tamed void Paxos_Server::handle_new_connections()
 tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
 {
   tvars {
-    modcomm_fd mpfd;
+    msgpack_fd mpfd;
     RPC_Msg request, reply;
     Json res;
   }
