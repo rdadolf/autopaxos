@@ -293,6 +293,8 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req) {
         me_->master_ = v[2].as_i();
         me_->epoch_ = v[1].as_i() + 1;
         me_->master_change_.make_event().trigger();
+        if( me_->i_am_master() )
+          DATA() << "MASTER " << port << " ALIVE";
         INFO() << "I, "<< me_->paxos_port_ << ", think master is : " << me_->master_;
     // } else (v[0].as_s() == "file") {
     }}
@@ -423,6 +425,9 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
         reply = RPC_Msg(res,request);
       } else if( request.content()[0]=="stop" ) {
         stopped_ = true;
+        if( i_am_master() ) {
+          DATA() << "MASTER " << paxos_port_ << " DEAD";
+        }
         reply = RPC_Msg(Json::array("ACK"),request);
         INFO() << "server " << listen_port_ << " stopping.";
       } else if( request.content()[0]=="start" ) {

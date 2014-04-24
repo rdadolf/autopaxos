@@ -10,3 +10,9 @@ nnodes
 .deps/*
 commands
 commands/*
+network.cc
+network.hh
+paxos.cc
+paxos.hh
+client.hh
+main.cc

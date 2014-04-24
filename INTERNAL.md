@@ -20,3 +20,11 @@ ADD:
 - bandwidth measurement (modcomm)
 - fake server death (state reset)
 - server start event
+
+----
+
+TODO:
+- create monotonic experiments (goodness vs. latency, vs. master drop)
+
+FUTURE:
+- make modcomm traffic counter per-instance (not static)

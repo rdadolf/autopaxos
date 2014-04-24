@@ -16,6 +16,7 @@
 #define INFO() LogInstance("INFO",__FILE__,__LINE__)
 #define WARN() LogInstance("WARN",__FILE__,__LINE__)
 #define ERROR() LogInstance("ERROR",__FILE__,__LINE__)
+#define DATA() LogInstance("DATA",__FILE__,__LINE__)
 
 class LogState {
 private:

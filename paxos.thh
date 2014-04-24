@@ -209,7 +209,6 @@ private:
 
     // Paxos Stuff
     int paxos_port_;
-    msgpack_fd paxm_mpfd_;
     Json paxi_;
     paxos::Paxos_Proposer* proposer_;
     paxos::Paxos_Acceptor* acceptor_;
