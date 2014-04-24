@@ -98,7 +98,7 @@ public:
 
     tamed void proposer_init(tamer::event<> done);
     tamed void client_init(const char* hostname, int port, tamer::fd& cfd, 
-                            modcomm_fd& mpfd, struct in_addr& hostip,tamer::event<> done);
+                            modcomm_fd& mpfd, struct in_addr& hostip,tamer::event<bool> done);
     tamed void send_to_all(RPC_Msg& req);
     tamed void run_instance(Json v,tamer::event<Json> done);
     tamed void propose(int n, Json v,tamer::event<> done);

@@ -1,6 +1,7 @@
 # fails a master then brings it back up after a time > master_timeout_
 
 make;
+echo "running masterfail";
 ./nnodes -n 3&
 sleep 2;
 ./commands/stop_server;
