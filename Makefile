@@ -31,7 +31,7 @@ endif
 ifeq ($(OS),OSX_POSTMAV)
 CXX=g++ -std=c++11
 endif
-CXXFLAGS=-Wall -g -O2 $(DEBUG) $(DEFINES) -I. -I$(DEPSDIR) -Imprpc -Imprpc/tamer -Imprpc/.deps -include config.h
+CXXFLAGS=-Wall -g -O2 $(DEBUG) $(DEFINES) -I. -Imprpc -Imprpc/tamer -Imprpc/.deps -include config.h
 LIBTAMER=mprpc/tamer/tamer/.libs/libtamer.a
 LIBS=$(LIBTAMER) `$(TAMERC) -l`
 LDFLAGS= -lpthread -lm $(LIBS)
@@ -40,62 +40,62 @@ MPRPC_OBJ=mprpc/msgpack.o mprpc/mpfd.o mprpc/string.o mprpc/straccum.o mprpc/jso
 MPRPC_HDR=mprpc/msgpack.hh mprpc/.deps/mpfd.hh mprpc/string.hh mprpc/straccum.hh mprpc/json.hh mprpc/compiler.hh mprpc/clp.h
 MPRPC = $(MPRPC_SRC) $(MPRPC_HDR) $(MPRPC_OBJ)
 
-COMMON_OBJ=network.o
-COMMON_HDR=log.hh $(DEPSDIR)/network.hh
-DEPSDIR := .deps
+COMMON_OBJ=network.o paxos.o
+COMMON_HDR=log.hh network.hh paxos.hh client.hh
 COMMAND_DIR := commands
 
 default: main nnodes commands
 
-%.o: %.cc $(DEPSDIR)/stamp
+%.o: %.cc
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-%.o: $(DEPSDIR)/%.cc $(DEPSDIR)/stamp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-# Suffix rules for files that need TAMING
-$(DEPSDIR)/%.cc: %.tcc $(DEPSDIR)/stamp
+# Pattern rules for files that need TAMING
+%.cc: %.tcc
 	$(TAMERC) $(TAMERFLAGS) -o $@ $<
-$(DEPSDIR)/%.hh: %.thh $(DEPSDIR)/stamp
+%.hh: %.thh
 	$(TAMERC) $(TAMERFLAGS) -o $@ $<
 
 main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
-	$(CXX) paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $< -o main $(LDFLAGS)
+	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o main $(LDFLAGS)
 
 nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
-	$(CXX) paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
+	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
 
-commands: stop_server start_server get_master_server
+commands: $(COMMAND_DIR)/stop_server $(COMMAND_DIR)/start_server $(COMMAND_DIR)/get_master_server
+
+EXPERIMENTS=experiments/monotonic_shift
+experiments: $(EXPERIMENTS)
+
+$(EXPERIMENTS): %: %.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
+	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o $@ $(LDFLAGS)
 
 #other types of behavior here
-%_server: $(DEPSDIR)/server_command.cc $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR) $(COMMAND_DIR)/stamp
-	$(CXX) $(CXXFLAGS) $(COMMON_OBJ) -DCOMMAND_TYPE_=\"$*\" $(MPRPC_OBJ) $< -o $(COMMAND_DIR)/$@ $(LDFLAGS)
+%_server: server_command.cc $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
+	$(CXX) $(CXXFLAGS) $(COMMON_OBJ) -DCOMMAND_TYPE_=\"$*\" $(MPRPC_OBJ) $< -o $@ $(LDFLAGS)
 
-$(COMMAND_DIR)/stamp:
-	mkdir -p $(dir $@)
-	touch $@
+network.o: network.hh
+paxos.o: paxos.cc paxos.hh
+main.o: main.cc paxos.hh client.hh $(COMMON_HDR)
+nnodes.o: nnodes.cc paxos.hh $(COMMON_HDR)
 
-$(DEPSDIR)/stamp:
-	mkdir -p $(dir $@)
-	touch $@
-
-network.o: $(addprefix $(DEPSDIR)/,network.cc network.hh)
-paxos.o: $(addprefix $(DEPSDIR)/,paxos.cc paxos.hh)
-main.o: $(addprefix $(DEPSDIR)/,main.cc paxos.hh client.hh) $(COMMON_HDR)
-nnodes.o: $(addprefix $(DEPSDIR)/,nnodes.cc paxos.hh) $(COMMON_HDR)
-
+TAMED_HH=$(patsubst %.thh,%.hh,$(wildcard *.thh))
+TAMED_CC=$(patsubst %.tcc,%.cc,$(wildcard *.tcc))
+echo:
+	@echo $(TAMED_HH)
+	@echo $(TAMED_CC)
 # Cleanup
 persist_clean:
 	rm -f *_persist log.txt
+	rm -f experiments/*persist experiments/log.txt
 clean: persist_clean
+	rm -f $(TAMED_HH) $(TAMED_CC)
 	rm -f main nnodes *.o
 	rm -rf *.dSYM
-	rm -rf $(DEPSDIR)
-	rm -rf $(COMMAND_DIR)
-	rm -f test/*.hh
+	rm -f $(COMMAND_DIR)/*
+	rm -f experiments/*.o
+	rm -f $(EXPERIMENTS)
 
 always:
 	@:
 
-.PHONY: default persist_clean clean always
-.PRECIOUS: $(DEPSDIR)/%.cc $(DEPSDIR)/%.hh
+.PHONY: default persist_clean clean always commands experiments default
