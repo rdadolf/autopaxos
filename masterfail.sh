@@ -3,7 +3,7 @@
 make;
 echo "running masterfail";
 ./nnodes -n 3&
-sleep 2;
+sleep 4; # wait for everything to come up
 ./commands/stop_server;
 sleep 6;
 ./commands/start_server;

@@ -192,7 +192,7 @@ public:
 };
 
 // class for getting the ports of the other members in the quorum
-class Paxos_Server {
+class Paxos_Server: public tamer::tamed_class {
 friend class paxos::Paxos_Proposer;
 friend class paxos::Paxos_Acceptor;
 private: 
@@ -212,7 +212,7 @@ private:
     paxos::Paxos_Proposer* proposer_;
     paxos::Paxos_Acceptor* acceptor_;
 public:
-    Paxos_Server(int port, int paxos, Json config);
+    Paxos_Server(int port, int paxos, Json config, int master = -1);
     ~Paxos_Server() {
         delete proposer_;
         delete acceptor_;

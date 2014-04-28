@@ -337,15 +337,15 @@ tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
 }
 
 // config should have have the form Json::array(Json::array(paxos_server port,paxos_acceptor port))
-Paxos_Server::Paxos_Server(int port, int paxos, Json config) {
+Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     listen_port_ = port;
-    master_ = -1;
+    master_ = master;
     master_timeout_ = MASTER_TIMEOUT; // FIXME
     heartbeat_freq_ = HEARTBEAT_FREQ; // FIXME (also, was MASTER_TIMEOUT/2)
-    epoch_ = 0;
+    epoch_ = (master_ < 0) ? 0 : 1;
     config_ = config;
     paxos_port_ = paxos;
-
+    WARN() << "master is " << master_;
     run_server();
 }
 tamed void Paxos_Server::run_server() {
@@ -500,6 +500,7 @@ Json Paxos_Server::get_master() {
         for (int i = 0; i < config_.size(); ++i) {
             if (config_[i][1].as_i() == master_) {
                 port = config_[i][0].as_i(); 
+                WARN() << "new master is: " << port;
                 break;
             }
         } 
@@ -514,9 +515,10 @@ tamed void Paxos_Server::receive_request(Json args, tamer::event<Json> ev) {
     INFO() << "receive_request";
     if (!i_am_master()) {
         req = get_master();
-        swap(*ev.result_pointer(),req);
+        *ev.result_pointer() = req;
+        // swap(*ev.result_pointer(),req);
     } else {
-        req = Json::array("blah",epoch_,args);
+        req = Json::array("blah",epoch_,args); // first argument, blah here, is the message type; "master" if master election
         twait { proposer_->run_instance(req,make_event(*ev.result_pointer())); }
     }
     ev.unblock();

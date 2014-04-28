@@ -35,6 +35,7 @@ tamed void run() {
         Paxos_Client* client;
         Json req,res;
         tamer::rendezvous<bool> r;
+        int master(15900);
         bool to;
     }
     for (i = 0; i < n; ++i) 
@@ -43,11 +44,12 @@ tamed void run() {
     modcomm_fd::set_delay(MODCOMM_DELAY); // FIXME
 
     for (i = 0; i < n; ++i)
-        ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config);
+        ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config, master);
     // FIXME: trigger paxos sync start event
     
     client = new Paxos_Client(config);
     twait { client->get_master(make_event()); }
+    WARN() << "here1";
     // stop master
     for (i = 0; i < n; ++i )
         if (ps[i]->who_is_master() == config[i][1].as_i()) {
@@ -56,10 +58,12 @@ tamed void run() {
             wait_start(ps[i]);
         }
     
+    WARN() << "here2";
     req = Json::array("test message",1,2,3,Json::null,Json::array());
     client->make_request(req,r.make_event(false,res));
     tamer::at_delay(15,r.make_event(true));
     twait(r,to);
+    WARN() << "here3";
     if (to)
         INFO () << "main timed out";
     tamer::break_loop();

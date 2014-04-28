@@ -44,7 +44,7 @@ COMMON_OBJ=network.o paxos.o
 COMMON_HDR=log.hh network.hh paxos.hh client.hh
 COMMAND_DIR := commands
 
-default: main nnodes commands
+default: main nnodes $(COMMAND_DIR)/server_command
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
@@ -61,8 +61,6 @@ main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
 nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
 
-commands: $(COMMAND_DIR)/stop_server $(COMMAND_DIR)/start_server $(COMMAND_DIR)/get_master_server
-
 EXPERIMENTS=experiments/monotonic_shift
 experiments: $(EXPERIMENTS)
 
@@ -70,8 +68,8 @@ $(EXPERIMENTS): %: %.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o $@ $(LDFLAGS)
 
 #other types of behavior here
-%_server: server_command.cc $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
-	$(CXX) $(CXXFLAGS) $(COMMON_OBJ) -DCOMMAND_TYPE_=\"$*\" $(MPRPC_OBJ) $< -o $@ $(LDFLAGS)
+$(COMMAND_DIR)/server_command: server_command.cc $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
+	$(CXX) $(CXXFLAGS) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o $@ $(LDFLAGS)
 
 network.o: network.hh
 paxos.o: paxos.cc paxos.hh
@@ -85,13 +83,13 @@ echo:
 	@echo $(TAMED_CC)
 # Cleanup
 persist_clean:
-	rm -f *_persist log.txt
+	rm -f *persist log.txt
 	rm -f experiments/*persist experiments/log.txt
 clean: persist_clean
 	rm -f $(TAMED_HH) $(TAMED_CC)
 	rm -f main nnodes *.o
-	rm -rf *.dSYM
-	rm -f $(COMMAND_DIR)/*
+	rm -rf *.dSYM $(COMMAND_DIR)/*.dSYM
+	rm -f $(COMMAND_DIR)/{server_command,log.txt}
 	rm -f experiments/*.o
 	rm -f $(EXPERIMENTS)
 

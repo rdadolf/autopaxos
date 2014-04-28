@@ -5,14 +5,12 @@ log.txt
 main
 nnodes
 *.jpeg
-*_persist
-.deps
-.deps/*
-commands
-commands/*
+*persist
 network.cc
 network.hh
 paxos.cc
 paxos.hh
 client.hh
 main.cc
+nnodes.cc
+server_command.cc
