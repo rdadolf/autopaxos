@@ -96,12 +96,8 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
       // master_ data already set.
     } else if( reply_master.content()[0].as_s()=="NACK" ) {
       master_known = false;
-      if( reply_master.content()[1].as_s()=="NOT_MASTER" ) {
-        /*if( reply_master.content()[2].is_s() ) {
-          get_ip_address( reply_master.content()[2].as_s().c_str(), master_.ip );
-        } else if( reply_master.content()[2].is_i() ) {
-          get_ip_address( reply_master.content()[2].as_i(), master_.ip );
-        }*/
+      if( reply_master.content()[1].as_s()=="NOT_MASTER" 
+          && reply_master.content()[3].as_i() > 0) { // be sure to check for an actual port being returned
         master_ = reply_master.content()[3].as_i();
       }
       

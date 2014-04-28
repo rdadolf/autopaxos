@@ -345,7 +345,6 @@ Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     epoch_ = (master_ < 0) ? 0 : 1;
     config_ = config;
     paxos_port_ = paxos;
-    WARN() << "master is " << master_;
     run_server();
 }
 tamed void Paxos_Server::run_server() {
@@ -500,10 +499,9 @@ Json Paxos_Server::get_master() {
         for (int i = 0; i < config_.size(); ++i) {
             if (config_[i][1].as_i() == master_) {
                 port = config_[i][0].as_i(); 
-                WARN() << "new master is: " << port;
                 break;
             }
-        } 
+        }
         return Json::array(String("NACK"),String("NOT_MASTER"),String("localhost"),port);
     }
 }
