@@ -89,7 +89,7 @@ clean: persist_clean
 	rm -f $(TAMED_HH) $(TAMED_CC)
 	rm -f main nnodes *.o
 	rm -rf *.dSYM $(COMMAND_DIR)/*.dSYM
-	rm -f $(COMMAND_DIR)/{server_command,log.txt}
+	rm -f $(COMMAND_DIR)/{server_command,log.txt,*persist}
 	rm -f experiments/*.o
 	rm -f $(EXPERIMENTS)
 
