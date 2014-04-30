@@ -71,10 +71,9 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
   INFO() << "get_master called";
 
   do {
+    do {
     INFO() << "Attempting to contact master " << master_;
     mpfd_.clear();
-
-    do {
         twait { client_init("localhost",master_,hostip,make_event()); }
         request_master = RPC_Msg(Json::array(String("get_master")));
         mpfd_.call(request_master,r.make_event(false,reply_master.json()));
@@ -84,8 +83,8 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
             INFO() << "retrying get_master";
             // select another port to contact
             for (i = 0; i < config_.size(); ++i) 
-                if (config_[1].as_i() != master_)
-                    master_ = config_[0].as_i();
+                if (config_[i][0].as_i() != master_)
+                    master_ = config_[i][0].as_i();
         }
         r.clear();
     } while(to);

@@ -49,7 +49,6 @@ tamed void run() {
     
     client = new Paxos_Client(config);
     twait { client->get_master(make_event()); }
-    WARN() << "here1";
     // stop master
     for (i = 0; i < n; ++i )
         if (ps[i]->who_is_master() == config[i][1].as_i()) {
@@ -57,13 +56,10 @@ tamed void run() {
             ps[i]->stop();
             wait_start(ps[i]);
         }
-    
-    WARN() << "here2";
     req = Json::array("test message",1,2,3,Json::null,Json::array());
     client->make_request(req,r.make_event(false,res));
-    tamer::at_delay(15,r.make_event(true));
+    tamer::at_delay(20,r.make_event(true));
     twait(r,to);
-    WARN() << "here3";
     if (to)
         INFO () << "main timed out";
     tamer::break_loop();
