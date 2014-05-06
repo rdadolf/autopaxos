@@ -49,6 +49,8 @@ tamed void run() {
     
     client = new Paxos_Client(config);
     twait { client->get_master(make_event()); }
+    twait { tamer::at_delay(5,make_event()); }
+    exit(1);
     // stop master
     for (i = 0; i < n; ++i )
         if (ps[i]->who_is_master() == config[i][1].as_i()) {

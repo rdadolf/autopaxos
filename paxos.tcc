@@ -207,16 +207,15 @@ tamed void Paxos_Proposer::send_heartbeat(tamer::event<> done) {
 
 tamed void Paxos_Acceptor::acceptor_init(tamer::event<> done) {
     tvars {
-        tamer::fd sfd;
         tamer::fd cfd;
     }
-    sfd = tamer::tcp_listen(port);
-    if (sfd)
+    sfd_ = tamer::tcp_listen(port);
+    if (sfd_)
         INFO() << "listening on port " << port;
     else
-        ERROR() << "listen: " << strerror(-sfd.error());
-    while (sfd) {
-        twait { sfd.accept(make_event(cfd)); }
+        ERROR() << "listen " << port << ": " << strerror(-sfd_.error());
+    while (sfd_) {
+        twait { sfd_.accept(make_event(cfd)); }
         handle_request(cfd);
     }
     done();
@@ -344,6 +343,7 @@ Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     heartbeat_freq_ = HEARTBEAT_FREQ; // FIXME (also, was MASTER_TIMEOUT/2)
     epoch_ = (master_ < 0) ? 0 : 1;
     config_ = config;
+    stopped_ = false;
     paxos_port_ = paxos;
     run_server();
 }
@@ -353,10 +353,12 @@ tamed void Paxos_Server::run_server() {
     // FIXME: paxos sync start event wait goes here
     twait { paxos_init(make_event()); }
     twait { tamer::at_delay_msec(rand_int(0,master_timeout_),make_event()); }
+    listen_for_master_change();
     if (master_ < 0) 
       twait { elect_me(make_event(j)); }
+    else 
+        master_change_.make_event().trigger();
     listen_for_heartbeats();
-    listen_for_master_change();
     handle_new_connections();
 }
 
@@ -403,7 +405,7 @@ tamed void Paxos_Server::handle_new_connections()
 {
   tvars {
     tamer::fd client_fd; // FIXME: only one simultaneous client. :(
-    tamer::fd listen_fd;
+    // tamer::fd listen_fd; 
   }
   
   listen_fd = tamer::tcp_listen(listen_port_);

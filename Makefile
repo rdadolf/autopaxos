@@ -44,7 +44,7 @@ COMMON_OBJ=network.o paxos.o
 COMMON_HDR=log.hh network.hh paxos.hh client.hh
 COMMAND_DIR := commands
 
-default: main nnodes $(COMMAND_DIR)/server_command
+default: main nnodes $(COMMAND_DIR)/server_command experiments
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -c -o $@ $<

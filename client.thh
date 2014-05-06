@@ -3,7 +3,7 @@
 #include "log.hh"
 #include "network.hh"
 
-class Paxos_Client {
+class Paxos_Client : public tamer::tamed_class {
 private:
     tamer::fd cfd_;
     msgpack_fd mpfd_;
@@ -13,7 +13,10 @@ private:
 public:
     Paxos_Client(Json config): config_(config),request_timeout_(2),master_(15800) {
     }
-
+    ~Paxos_Client() {
+        if (cfd_)
+            cfd_.close();
+    }
     // client functions
     tamed void client_init(const char* hostname, int port,
                             struct in_addr hostip,tamer::event<> done);
@@ -43,7 +46,8 @@ tamed void Paxos_Client::client_init(const char* hostname, int port,
             hostip = *((struct in_addr*) hp->h_addr);
         }
     }
-
+    if (cfd_)
+        cfd_.close();
     twait { tamer::tcp_connect(hostip, port, make_event(cfd_)); }
     while (!cfd_) {
         INFO() << "delaying to connect to " << port << ": " << s;
@@ -63,31 +67,26 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
     Json master_info;
     struct in_addr hostip;
     bool master_known=false;
-    tamer::rendezvous<bool> r;
-    bool to;
-    int i;
+    int to,i;
   }
 
   INFO() << "get_master called";
 
   do {
     do {
-    INFO() << "Attempting to contact master " << master_;
-    mpfd_.clear();
+        INFO() << "Attempting to contact master " << master_;
+        mpfd_.clear();
         twait { client_init("localhost",master_,hostip,make_event()); }
         request_master = RPC_Msg(Json::array(String("get_master")));
-        mpfd_.call(request_master,r.make_event(false,reply_master.json()));
-        tamer::at_delay(request_timeout_,r.make_event(true));
-        twait(r,to);
-        if (to) {
+        twait { mpfd_.call(request_master,with_timeout(request_timeout_,make_event(reply_master.json()),to)); }
+        if (to != 0) {
             INFO() << "retrying get_master";
             // select another port to contact
             for (i = 0; i < config_.size(); ++i) 
                 if (config_[i][0].as_i() != master_)
                     master_ = config_[i][0].as_i();
         }
-        r.clear();
-    } while(to);
+    } while(to != 0);
     // FIXME: validate
     INFO() << reply_master.content();
     if( reply_master.content()[0].as_s()=="ACK" ) {
@@ -111,21 +110,19 @@ tamed void Paxos_Client::get_master(tamer::event<> ev)
 tamed void Paxos_Client::make_request(Json msg, tamer::event<Json> ev) {
     tvars { 
         RPC_Msg req,ret;
-        tamer::rendezvous<bool> r;
-        bool done(false);
+        int done(0);
     }
+    if (!mpfd_)
+        abort();
     do {
         INFO() << "making request to " << master_;
         req = RPC_Msg(Json::array("request",msg));
-        mpfd_.call(req,r.make_event(true,ret.json()));
-        tamer::at_delay(request_timeout_,r.make_event(false));
-        twait(r,done);
-        r.clear();
-        if (!done) { // request timed out 
+        twait { mpfd_.call(req,with_timeout(request_timeout_,make_event(ret.json()),done)); }
+        if (done != 0) { // request timed out 
             INFO () << "client request timed out";
             twait { get_master(make_event()); }
         } 
-    } while(!done);
+    } while(done != 0);
     INFO() << "client finished request: " << ret.content();
     swap(*ev.result_pointer(),ret.content());
     ev.unblock();

@@ -26,7 +26,7 @@ namespace paxos {
 
 class Paxos_Server;
 
-class Paxos_Proposer{
+class Paxos_Proposer: public tamer::tamed_class {
 public:
     typedef Paxos_Proposer ppropose_type;
 
@@ -75,7 +75,8 @@ public:
     }
     ~Paxos_Proposer() {
         for (std::vector<int>::size_type i = 0; i < ports.size() ; ++i)
-            cfd[i].close();
+            if (cfd[i])
+                cfd[i].close();
         ports.clear();
         cfd.clear();
         mpfd.clear();
@@ -108,9 +109,10 @@ public:
     
 };
 
-class Paxos_Acceptor{
+class Paxos_Acceptor: public tamer::tamed_class {
 public:
     typedef Paxos_Acceptor paccept_type;
+    tamer::fd sfd_;
 
     Paxos_Server* me_;
 
@@ -121,7 +123,6 @@ public:
     // persist to disk
     int fd_;
     char* mapd;
-
 
     Paxos_Acceptor() : 
         me_(NULL),
@@ -141,6 +142,8 @@ public:
     }
 
     ~Paxos_Acceptor() {
+        if (sfd_)
+            sfd_.close();
         munmap(mapd, MAP_SIZE);
         close(fd_);
         String fn(port);
@@ -198,13 +201,14 @@ friend class paxos::Paxos_Acceptor;
 private: 
     tamer::rendezvous<bool> elect_me_;
     tamer::rendezvous<> master_change_;
+    tamer::fd listen_fd;
     int listen_port_;
     int master_;
     int master_timeout_;
     int heartbeat_freq_;
     int epoch_; // everything is going to start in epoch 0; once a master is elected, it moves to epoch 1
     Json config_;
-    bool stopped_ = false;
+    bool stopped_;
 
     // Paxos Stuff
     int paxos_port_;
@@ -216,6 +220,8 @@ public:
     ~Paxos_Server() {
         delete proposer_;
         delete acceptor_;
+        if (listen_fd)
+            listen_fd.close();
     }
 
     bool i_am_master() {
