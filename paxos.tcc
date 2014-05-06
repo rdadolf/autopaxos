@@ -340,8 +340,8 @@ tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
 Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     listen_port_ = port;
     master_ = master;
-    master_timeout_ = MASTER_TIMEOUT; // FIXME
-    heartbeat_freq_ = HEARTBEAT_FREQ; // FIXME (also, was MASTER_TIMEOUT/2)
+    master_timeout_ = 500;
+    heartbeat_freq_ = 300; // was originally master_timeout_/2
     epoch_ = (master_ < 0) ? 0 : 1;
     config_ = config;
     paxos_port_ = paxos;
