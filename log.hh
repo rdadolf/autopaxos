@@ -65,11 +65,11 @@ public:
   }
   ~LogInstance() {
     struct timeval tv;
-    char prefix[60];
+    char prefix[70];
     String final_buffer;
 
     gettimeofday(&tv, 0);
-    snprintf(prefix, 60, "%ld.%06d [%d:%s:%d] %s: ",
+    snprintf(prefix, 70, "%ld.%06d [%d:%s:%d] %s: ",
       tv.tv_sec, (int)tv.tv_usec, getpid(), file_, line_, mode_);
     final_buffer += prefix;
     final_buffer += buffer_;
