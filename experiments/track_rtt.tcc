@@ -23,21 +23,28 @@ using namespace paxos;
 
 // Experimental constants
 const int MOD_MIN_DELAY = 10;
-const int MOD_MAX_DELAY = 100;
+const int MOD_MAX_DELAY = 300;
 const int CHANGE_DELAY = 1000;
 const int SAMPLE_DELAY = 100;
-const int N_STEPS = 5;
+const int N_STEPS = 20;
 
 
 tamed void start_sampling_rtt_estimate(const int delay, Paxos_Server *master)
 {
-  tvars { }
+  tvars { 
+    struct timeval tv0,tv1;
+    uint64_t t0,t1;
+  }
 
   while(1) {
+    //gettimeofday(&tv0,NULL);
+    //t0 = UINT64_C(1000000)*tv0.tv_sec + tv0.tv_usec;
     twait {
       at_delay_msec(delay, make_event());
     }
-    DATA() << "Master RTT Estimate: " << master->telemetry.rtt_estimate_;
+    //gettimeofday(&tv1,NULL);
+    //t1 = UINT64_C(1000000)*tv1.tv_sec + tv1.tv_usec;
+    DATA() << "Master RTT Estimate: " << master->telemetry_.rtt_estimate_;
   }
 }
 
@@ -45,7 +52,7 @@ tamed void start_changing_latency(const int delay, const int min_value, const in
 {
   tvars {
     brand_t br_state;
-    uint64_t rand_delay;
+    uint64_t rand_latency;
   }
 
   brand_init(&br_state, UINT64_C(80858175)); // event-loop-proof random numbers
@@ -54,9 +61,9 @@ tamed void start_changing_latency(const int delay, const int min_value, const in
     twait {
       at_delay_msec(delay, make_event());
     }
-    rand_delay = ( brand(&br_state) % (max_value-min_value) ) + min_value;
-    modcomm_fd::set_delay(rand_delay);
-    DATA() << "Latency set to: " << rand_delay;
+    rand_latency = ( brand(&br_state) % (max_value-min_value) ) + min_value;
+    modcomm_fd::set_delay(rand_latency);
+    DATA() << "Latency set to: " << rand_latency;
   }
 
 }
@@ -75,12 +82,10 @@ tamed void run() {
   }
 
   /*
-    Plot Goodness vs. Latency
-    Goodness (===uptime/traffic)
-      uptime: approximate using time for k rounds of iterated paxos
-      traffic: measure using # of bytes (or, for now, packets) transferred
-    Latency
-      Sweep using modcomm
+    RTT Estimator vs. Actual Latency
+
+    Modulate latency over time.
+    Measure RTT estimator values.
   */
 
   // Experimental setup
@@ -102,6 +107,7 @@ tamed void run() {
     at_delay_msec(CHANGE_DELAY*(N_STEPS+1), make_event());
   }
 
+  WARN() << "Breaking loop";
   tamer::break_loop();
 }
 

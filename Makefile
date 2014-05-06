@@ -20,7 +20,7 @@ endif
 ### Compile switches
 # comment/uncomment
 #DEBUG=-g -DDEBUG=1
-DEFINES=-DMODCOMM_DELAY=0 -DMASTER_TIMEOUT=5000 -DHEARTBEAT_FREQ=3500
+DEFINES=
 
 TAMERC=mprpc/tamer/compiler/tamer
 TAMERFLAGS=
@@ -31,7 +31,7 @@ endif
 ifeq ($(OS),OSX_POSTMAV)
 CXX=g++ -std=c++11
 endif
-CXXFLAGS=-Wall -g -O2 $(DEBUG) $(DEFINES) -I. -Imprpc -Imprpc/tamer -Imprpc/.deps -include config.h
+CXXFLAGS=-W -g -O2 $(DEBUG) $(DEFINES) -I. -Imprpc -Imprpc/tamer -Imprpc/.deps -include config.h
 LIBTAMER=mprpc/tamer/tamer/.libs/libtamer.a
 LIBS=$(LIBTAMER) `$(TAMERC) -l`
 LDFLAGS= -lpthread -lm $(LIBS)
@@ -46,7 +46,7 @@ COMMAND_DIR := commands
 
 default: main nnodes $(COMMAND_DIR)/server_command experiments
 
-%.o: %.cc
+$(COMMON_OBJ) main.o nnodes.o: %.o: %.cc $(COMMON_HDR) $(MPRPC_HDR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Pattern rules for files that need TAMING
@@ -64,6 +64,9 @@ nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 #EXPERIMENTS=experiments/monotonic_shift
 EXPERIMENTS=experiments/track_rtt
 experiments: $(EXPERIMENTS)
+
+$(addsuffix .o,$(EXPERIMENTS)): %.o: %.cc $(COMMON_HDR) $(MPRPC_HDR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(EXPERIMENTS): %: %.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o $@ $(LDFLAGS)

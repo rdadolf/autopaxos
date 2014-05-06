@@ -100,7 +100,7 @@ start:
         goto done;
     }
     propose(n,v,r.make_event(false));
-    tamer::at_delay_sec(4,r.make_event(true));
+    tamer::at_delay_sec(4,r.make_event(true)); // FIXME: 4 seconds is...?
     twait(r,to);
     if (to) { // timeout happened
         INFO() << "restarting after propose";;
@@ -113,7 +113,7 @@ start:
     }
 
     accept(n,r.make_event(false));
-    tamer::at_delay_sec(4,r.make_event(true));
+    tamer::at_delay_sec(4,r.make_event(true)); // FIXME: 4 seconds is...?
     twait(r,to);
     if (to) {
         INFO() << "restarting after accept";;
@@ -198,11 +198,54 @@ tamed void Paxos_Proposer::accept(int n, tamer::event<> done) {
     done();
 }
 
-tamed void Paxos_Proposer::send_heartbeat(tamer::event<> done) {
-    tvars { RPC_Msg req; tamer::event<> e;}
+tamed void Paxos_Proposer::send_heartbeat() {
+    tvars {
+      RPC_Msg req;
+      unsigned int n = ports.size();
+      std::vector<RPC_Msg> resp(n);
+      tamer::event<> e;
+      std::vector<int>::size_type i;
+      std::vector<int> results(n);
+      tamer::rendezvous<> r;
+      struct timeval t;
+      std::vector<uint64_t> t0s(n), t1s(n);
+      uint64_t sum;
+    }
+
+    n = ports.size();
+
     req = RPC_Msg(Json::array(HEARTBEAT,me_->epoch_));
-    send_to_all(req);
-    done();
+
+    // Send to all (with a node timeout);
+    for (i=0; i<n; ++i) {
+      t0s[i] = Telemetry::time();
+      mpfd[i].call( req, with_timeout_msec(me_->heartbeat_timeout_,
+                                           r.make_event(resp[i].json())) );
+    }
+
+    // Wait for responses, and grab timing info
+    for( i=0; i<n; ++i) {
+      twait(r);
+      t1s[i] = Telemetry::time(); // FIXME: These may not be in order. (problem?)
+    }
+
+    // Average RTT's and update estimate for this round
+    sum = 0;
+    for( i=0; i<n; ++i ) {
+      sum += t1s[i] - t0s[i];
+    }
+    me_->telemetry_.update_rtt_estimate( sum/n );
+
+    // Check status of all. FIXME: future functionality?
+    for( i=0; i<n; ++i ) {
+      if( results[i]==0 ) {
+        // response received
+      } else if( results[i]==-ETIMEDOUT ) {
+        // timeout
+      } else {
+        // signal
+      }
+    }
 }
 
 tamed void Paxos_Acceptor::acceptor_init(tamer::event<> done) {
@@ -341,6 +384,7 @@ Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     master_ = master;
     master_timeout_ = 500;
     heartbeat_freq_ = 300; // was originally master_timeout_/2
+    heartbeat_timeout_ = master_timeout_;
     epoch_ = (master_ < 0) ? 0 : 1;
     config_ = config;
     stopped_ = false;
@@ -352,13 +396,16 @@ tamed void Paxos_Server::run_server() {
     INFO () << "starting paxos server";
     // FIXME: paxos sync start event wait goes here
     twait { paxos_init(make_event()); }
-    twait { tamer::at_delay_msec(rand_int(0,master_timeout_),make_event()); }
+    twait { tamer::at_delay_msec(rand_int(0,1000),make_event()); }
     listen_for_master_change();
+    INFO() << "Now listening for master change";
     if (master_ < 0) 
       twait { elect_me(make_event(j)); }
     else 
         master_change_.make_event().trigger();
+    INFO() << "Past master check";
     listen_for_heartbeats();
+    INFO() << "Now listening for heartbeats";
     handle_new_connections();
 }
 
@@ -394,6 +441,7 @@ tamed void Paxos_Server::listen_for_heartbeats() {
     if (em) {
       elect_me_.clear();
       INFO() << "master timed out " << paxos_port_;
+      telemetry_.master_drop_event(epoch_);
       master_ = -1;
       twait { elect_me(tamer::make_event(j)); }
     } else 
@@ -485,8 +533,11 @@ tamed void Paxos_Server::listen_for_master_change() {
 tamed void Paxos_Server::beating_heart(tamer::event<> ev) {
     while (i_am_master()) {
         if (!stopped_) {
-            twait { proposer_->send_heartbeat(make_event()); }
             INFO() << "Paxos_Server sending heartbeat " << paxos_port_;
+            // Do not wait. Let the heartbeats go on their own.
+            // We need to send another round in hb_freq_ ms,
+            // regardless of whether these are done.
+            proposer_->send_heartbeat();
         }
         twait { tamer::at_delay_msec(heartbeat_freq_, make_event()); }
     }
