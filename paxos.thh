@@ -10,6 +10,7 @@
 #include "log.hh"
 #include "network.hh"
 #include <netdb.h>
+#include "telemetry.hh"
 
 #define WAIT            0   // waiting to start
 #define PREPARE         1   // prepare message
@@ -198,7 +199,7 @@ public:
 class Paxos_Server: public tamer::tamed_class {
 friend class paxos::Paxos_Proposer;
 friend class paxos::Paxos_Acceptor;
-private: 
+public: // [RDA]: Changed to expose state to experiments so we can poke things.
     tamer::rendezvous<bool> elect_me_;
     tamer::rendezvous<> master_change_;
     tamer::fd listen_fd;
@@ -209,6 +210,9 @@ private:
     int epoch_; // everything is going to start in epoch 0; once a master is elected, it moves to epoch 1
     Json config_;
     bool stopped_;
+
+    // Autopaxos stuff
+    Telemetry telemetry;
 
     // Paxos Stuff
     int paxos_port_;

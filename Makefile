@@ -41,7 +41,7 @@ MPRPC_HDR=mprpc/msgpack.hh mprpc/.deps/mpfd.hh mprpc/string.hh mprpc/straccum.hh
 MPRPC = $(MPRPC_SRC) $(MPRPC_HDR) $(MPRPC_OBJ)
 
 COMMON_OBJ=network.o paxos.o
-COMMON_HDR=log.hh network.hh paxos.hh client.hh
+COMMON_HDR=log.hh network.hh paxos.hh client.hh telemetry.hh brand.h
 COMMAND_DIR := commands
 
 default: main nnodes $(COMMAND_DIR)/server_command experiments
@@ -61,7 +61,8 @@ main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
 nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
 
-EXPERIMENTS=experiments/monotonic_shift
+#EXPERIMENTS=experiments/monotonic_shift
+EXPERIMENTS=experiments/track_rtt
 experiments: $(EXPERIMENTS)
 
 $(EXPERIMENTS): %: %.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)

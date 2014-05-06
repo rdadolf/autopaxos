@@ -1,0 +1,40 @@
+#include <stdlib.h>
+#include <stdint.h>
+#include <sys/time.h>
+
+class Telemetry {
+public: // [RDA]: Changed so experiments have access.
+  // Constants
+  static const uint64_t rtt_ewma_alpha_ = 80; // E(t) = (a)*RTT(t) + (1-a)*E(t-1)
+  static const uint64_t rtt_ewma_norm_ = 100; // rtt_ewma_alpha demoninator
+
+  // RTT Estimator
+  uint64_t rtt_estimate_; // usecs
+  uint64_t rtt_last_start_; // users
+  void update_rtt_estimate(uint64_t new_estimate) {
+    // Calc EWMA
+    rtt_estimate_ = ((rtt_ewma_alpha_)*new_estimate)/rtt_ewma_norm_
+                  + ((1-rtt_ewma_alpha_)*rtt_estimate_)/rtt_ewma_norm_;
+  }
+
+public:
+  Telemetry() {
+    rtt_estimate_ = 0;
+  }
+  ~Telemetry() { }
+
+  void start_rtt_timer() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    rtt_last_start_ = 1000000*tv.tv_sec + tv.tv_usec;
+  }
+  void stop_rtt_timer() {
+    struct timeval tv;
+    uint64_t new_rtt_obs;
+    gettimeofday(&tv, NULL);
+    new_rtt_obs = 1000000*tv.tv_sec + tv.tv_usec;
+    update_rtt_estimate(new_rtt_obs);
+  }
+
+  
+};
