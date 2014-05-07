@@ -76,6 +76,8 @@ def plot_events(latency, e_rtt, hb):
   ax.axvline(hb[0,0],ls=':',color=rgb(196,196,196),label='Heartbeat Messages')
   for (t,_) in hb[1:]:
     ax.axvline(t,ls=':',color=rgb(196,196,196))
+  t_max = max(np.max(latency[:,0]),np.max(e_rtt[:,0]),np.max(hb[:,0]))
+  ax.set_xlim((0,t_max))
   ax.set_xlabel(r'Time')
   ax.set_ylabel(r'Latency ($\mu$s)')
   ax.set_title(r'Tracking performance of RTT Estimator')
