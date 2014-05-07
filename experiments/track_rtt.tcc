@@ -24,9 +24,10 @@ using namespace paxos;
 // Experimental constants
 const int MOD_MIN_DELAY = 10;
 const int MOD_MAX_DELAY = 300;
-const int CHANGE_DELAY = 1000;
-const int SAMPLE_DELAY = 100;
-const int N_STEPS = 20;
+const int CHANGE_DELAY = 2000;
+const int SAMPLE_DELAY = 50;
+const int HEARTBEAT_INTERVAL = 150;
+const int N_STEPS = 8;
 
 
 tamed void start_sampling_rtt_estimate(const int delay, Paxos_Server *master)
@@ -97,7 +98,7 @@ tamed void run() {
   for (i=0; i<n; ++i) {
     ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config, master);
     ps[i]->master_timeout_ = 1000000;//never
-    ps[i]->heartbeat_freq_ = 2*SAMPLE_DELAY;
+    ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
   }
 
   // Experiment body
