@@ -99,9 +99,10 @@ tamed void run() {
   start_changing_latency(CHANGE_DELAY, MOD_MIN_DELAY, MOD_MAX_DELAY);
   start_sampling_rtt_estimate(SAMPLE_DELAY, ps[master_index]);
   twait {
-    at_delay_msec(CHANGE_DELAY*(N_STEPS+1), make_event());
+    at_delay_msec(3000 + CHANGE_DELAY*(N_STEPS+1), make_event());
   }
 
+  DATA () << "breaking loop";
   tamer::break_loop();
 }
 

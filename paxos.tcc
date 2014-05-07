@@ -352,7 +352,7 @@ tamed void Paxos_Server::run_server() {
     INFO () << "starting paxos server";
     // FIXME: paxos sync start event wait goes here
     twait { paxos_init(make_event()); }
-    twait { tamer::at_delay_msec(rand_int(0,master_timeout_),make_event()); }
+    twait { tamer::at_delay_msec(rand_int(0,1000),make_event()); }
     listen_for_master_change();
     if (master_ < 0) 
       twait { elect_me(make_event(j)); }
