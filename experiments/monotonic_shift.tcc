@@ -22,6 +22,7 @@ using namespace paxos;
 
 tamed void make_requests(Paxos_Client* client,tamer::event<> ev) {
   tvars {
+    tamer::destroy_guard guard(client);
     RPC_Msg msg,res; 
   }
   msg = RPC_Msg(Json::object("foo","bar",
@@ -51,10 +52,11 @@ tamed void run() {
   for (j = 0; j < iterations; j++) {
     system("rm -rf *_persist");
     INFO() << "window " << j << " starting.";
-    modcomm_fd::set_delay(MODCOMM_DELAY); // FIXME
     for (i = 0; i < n; ++i)
       ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config,master);
     
+    modcomm_fd::set_delay(MODCOMM_DELAY); // FIXME
+
     // initialize client
     client = new Paxos_Client(config);
     twait { client->get_master(make_event()); }
@@ -67,7 +69,6 @@ tamed void run() {
 
     INFO() << "window " << j << " done.";
 
-
     data = modcomm_fd::data_transferred();
     DATA() << "Session stats: " << data << " packets sent over 5 seconds.";
 
@@ -76,6 +77,8 @@ tamed void run() {
     delete client;
   }
   // FIXME: trigger paxos sync start event
+
+  tamer::break_loop();
 }
 
 int main() {
