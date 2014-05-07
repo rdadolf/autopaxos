@@ -15,16 +15,16 @@ def rgb(r,g,b):
     return (float(r)/256.,float(g)/256.,float(b)/256.)
 # Modified colorbrewer2.org qualitative color table (8-paired)
 cb2 = [ rgb(31,120,180), rgb(255,127,0), rgb(51,160,44), rgb(227,26,28), rgb(166,206,227), rgb(253,191,111), rgb(178,223,138), rgb(251,154,153) ]
-rcParams['figure.figsize'] = (6, 4)
+rcParams['figure.figsize'] = (8,6)
 rcParams['figure.dpi'] = 150
 rcParams['axes.color_cycle'] = cb2
 rcParams['lines.linewidth'] = 1
 rcParams['axes.facecolor'] = 'white'
-rcParams['font.size'] = 14
+rcParams['font.size'] = 12
 rcParams['patch.edgecolor'] = 'white'
 rcParams['patch.facecolor'] = cb2[0]
 rcParams['font.family'] = 'Helvetica'
-rcParams['font.weight'] = 300
+rcParams['font.weight'] = 100
 # ^^^^^ MPL Boilerplate ^^^^^
 ################################################################################
 
@@ -52,20 +52,34 @@ def parse_events(file):
 
     m = re.match('(\d+\.\d+).*INFO: got heartbeat.*', line)
     if m is not None:
-      e_rtt.append( (float(m.group(1)), 1) )
+      hb.append( (float(m.group(1)), 1) )
 
-  return (np.array(latency), np.array(e_rtt), np.array(hb))
+  t0 = min(latency[0][0], e_rtt[0][0], hb[0][0])
+  return ( np.array([(t-t0,x) for (t,x) in latency]),
+           np.array([(t-t0,x) for (t,x) in e_rtt]),
+           np.array([(t-t0,x) for (t,x) in hb]))
 
 def plot_events(latency, e_rtt, hb):
   (fig,ax) = plt.subplots()
 
-  ax.plot( latency[:,0], latency[:,1], color=cb2[0] )
-  ax.plot( e_rtt[:,0], e_rtt[:,1]/2000., color=cb2[1] )
-  for (t,_) in hb:
-    ax.axvline(t,ls='--',color='gray',alpha=0.5)
-  ax.set_xlabel(r'Time $\to$')
+  # Turn latency into a step function
+  latency_step_t = np.zeros((latency.shape[0]*2))
+  latency_step_l = np.zeros((latency.shape[0]*2))
+  latency_step_t[::2] = latency[:,0]
+  latency_step_t[1:-1:2]= latency[1:,0]
+  latency_step_t[-1] = latency[-1,0] + 1.0 # CHANGE_DELAY (in sec)
+  latency_step_l[::2] = latency[:,1]
+  latency_step_l[1::2]= latency[:,1]
+
+  ax.plot( latency_step_t, latency_step_l, color=cb2[0], label='Actual Latency' )
+  ax.plot( e_rtt[:,0], e_rtt[:,1]/2000., color=cb2[1], label='Estimated Latency' )
+  ax.axvline(hb[0,0],ls=':',color=rgb(196,196,196),label='Heartbeat Messages')
+  for (t,_) in hb[1:]:
+    ax.axvline(t,ls=':',color=rgb(196,196,196))
+  ax.set_xlabel(r'Time')
   ax.set_ylabel(r'Latency ($\mu$s)')
   ax.set_title(r'Tracking performance of RTT Estimator')
+  ax.legend(loc=2)
   fig.tight_layout()
   return (fig,ax)
 
