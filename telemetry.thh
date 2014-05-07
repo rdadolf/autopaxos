@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/time.h>
+#include "log.hh"
 
 class Telemetry {
 public: // [RDA]: Changed so experiments have access.
@@ -10,31 +11,38 @@ public: // [RDA]: Changed so experiments have access.
 
   // RTT Estimator
   uint64_t rtt_estimate_; // usecs
-  uint64_t rtt_last_start_; // users
-  void update_rtt_estimate(uint64_t new_estimate) {
-    // Calc EWMA
-    rtt_estimate_ = ((rtt_ewma_alpha_)*new_estimate)/rtt_ewma_norm_
-                  + ((1-rtt_ewma_alpha_)*rtt_estimate_)/rtt_ewma_norm_;
-  }
+
+  // Master Drop Counter
+  int64_t epoch_counter_;
+  uint64_t master_drop_mtbf_;
 
 public:
   Telemetry() {
     rtt_estimate_ = 0;
+    epoch_counter_ = 1;
   }
   ~Telemetry() { }
 
-  void start_rtt_timer() {
+  // RTT Estimator
+  static inline uint64_t time() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    rtt_last_start_ = 1000000*tv.tv_sec + tv.tv_usec;
+    return UINT64_C(1000000)*tv.tv_sec + tv.tv_usec;
   }
-  void stop_rtt_timer() {
-    struct timeval tv;
-    uint64_t new_rtt_obs;
-    gettimeofday(&tv, NULL);
-    new_rtt_obs = 1000000*tv.tv_sec + tv.tv_usec;
-    update_rtt_estimate(new_rtt_obs);
+  void update_rtt_estimate(uint64_t new_estimate) {
+    uint64_t rtt_estimate_before = rtt_estimate_;
+    // Calc EWMA
+    rtt_estimate_ = ((rtt_ewma_alpha_)*new_estimate)/rtt_ewma_norm_
+                  + ((rtt_ewma_norm_-rtt_ewma_alpha_)*rtt_estimate_)/rtt_ewma_norm_;
+    INFO() << "Updating RTT EWMA: [before] " << rtt_estimate_before
+                             << " [after] " << rtt_estimate_
+                             << " [with] " << new_estimate;
   }
 
-  
+  void master_drop_event(int epoch)
+  {
+    if( epoch>=epoch_counter_ ) {
+      // FIXME: update MTBF somehow
+    }
+  }
 };

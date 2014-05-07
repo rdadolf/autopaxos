@@ -106,7 +106,7 @@ public:
     tamed void propose(int n, Json v,tamer::event<> done);
     tamed void accept(int n, tamer::event<> done);
 
-    tamed void send_heartbeat(tamer::event<> done);
+    tamed void send_heartbeat();
     
 };
 
@@ -207,12 +207,13 @@ public: // [RDA]: Changed to expose state to experiments so we can poke things.
     int master_;
     int master_timeout_;
     int heartbeat_freq_;
+    int heartbeat_timeout_;
     int epoch_; // everything is going to start in epoch 0; once a master is elected, it moves to epoch 1
     Json config_;
     bool stopped_;
 
     // Autopaxos stuff
-    Telemetry telemetry;
+    Telemetry telemetry_;
 
     // Paxos Stuff
     int paxos_port_;
