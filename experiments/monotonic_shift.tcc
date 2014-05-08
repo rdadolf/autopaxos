@@ -18,6 +18,8 @@
 #include "paxos.hh"
 #include "client.hh"
 
+#define MODCOMM_DELAY 0
+
 using namespace paxos;
 
 tamed void make_requests(Paxos_Client* client,tamer::event<> ev) {

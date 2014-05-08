@@ -7,6 +7,8 @@
 
 #include "paxos.hh"
 
+const int HEARTBEAT_INTERVAL = 150;
+
 using namespace paxos;
 
 tamed void run(int n, int ssp, int psp) {
@@ -21,12 +23,13 @@ tamed void run(int n, int ssp, int psp) {
 
     for (i = 0; i < n; ++i)
         ps[i] = new Paxos_Server(ssp + i, psp + i, config);
+
 }
 
 static Clp_Option options[] = {
     { "nnodes", 'n', 0, Clp_ValInt, 0 },
     { "server_port", 's', 0, Clp_ValInt, 0 },
-    { "paxos_port", 'p', 0, Clp_ValInt ,0 }
+    { "paxos_port", 'p', 0, Clp_ValInt , 0 }
 };
 
 int main(int argc, char** argv) {
