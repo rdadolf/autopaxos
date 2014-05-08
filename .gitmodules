@@ -1,3 +1,3 @@
 [submodule "mprpc"]
 	path = mprpc
-	url = ./mprpc
+	url = git@github.com:kohler/mprpc.git
