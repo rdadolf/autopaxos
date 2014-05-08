@@ -1,0 +1,45 @@
+% !TEX TS-program = pdflatexmk
+% For TeXShop on OS X and Herbert Schulz's latexmk engine.
+
+\documentclass[pageno]{jpaper}
+\usepackage{url}
+\usepackage{titling}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{enumerate}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{lipsum}
+
+\newcommand{\asplossubmissionnumber}{XXX}
+
+
+\title{AUTOPAXOS!}
+\author{Bob Adolf and Mike Rizzo\\Harvard University}
+\date{}
+%\setlength{\droptitle}{-50pt} %maketitle vskips 60pt, this takes most of it away
+\pretitle{% The ASPLOS title, without the ASPLOS submission and extra vspace
+\begin{center}%
+\normalfont\Large\bfseries%
+}
+\posttitle{\par\end{center}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\lipsum[1]
+\end{abstract}
+
+\input{intro}
+\input{motivation}
+\input{design}
+\input{evaluation}
+\input{related}
+\input{conclusion}
+
+\bibliographystyle{plain}
+\bibliography{autopaxos}
+
+\end{document}

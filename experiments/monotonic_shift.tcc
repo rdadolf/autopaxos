@@ -57,7 +57,7 @@ tamed void run() {
     for (i = 0; i < n; ++i)
       ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config,master);
     
-    modcomm_fd::set_delay(MODCOMM_DELAY); // FIXME
+    modcomm_fd::set_delay(0); // FIXME
 
     // initialize client
     client = new Paxos_Client(config);

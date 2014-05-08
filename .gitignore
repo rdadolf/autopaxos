@@ -17,3 +17,12 @@ server_command.cc
 telemetry.hh
 experiments/track_rtt
 experiments/track_rtt.cc
+autopaxos.aux
+autopaxos.bbl
+autopaxos.blg
+autopaxos.fdb_latexmk
+autopaxos.fls
+autopaxos.log
+autopaxos.out
+autopaxos.pdf
+autopaxos.synctex.gz
