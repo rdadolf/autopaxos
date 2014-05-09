@@ -16,7 +16,8 @@ nnodes.cc
 server_command.cc
 telemetry.hh
 experiments/track_rtt
-experiments/track_rtt.cc
+experiments/cyclic_shift
+experiments/*.cc
 autopaxos.aux
 autopaxos.bbl
 autopaxos.blg

@@ -7,8 +7,6 @@
 
 #include "paxos.hh"
 
-const int HEARTBEAT_INTERVAL = 150;
-
 using namespace paxos;
 
 tamed void run(int n, int ssp, int psp) {
