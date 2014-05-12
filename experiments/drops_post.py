@@ -23,12 +23,17 @@ def plot_master_drops(file,master):
             plt.vlines(e[0]/1000,0,1,colors='r',linestyles='dashed')
     plt.show()
 
-def main(file):
+def main(file,master):
     # second parameter is whether we are looking for a master stop
-    plot_master_drops(file,True)
+    plot_master_drops(file,master)
 
 if __name__ == '__main__':
     fname = "log.txt"
-    if len(sys.argv) > 2 and sys.argv[1] == "-n":
-        fname = sys.argv[2]
-    main(fname)
+    master = True
+    while len(sys.argv) > 2: 
+        if sys.argv[1] == "-n":
+            fname = sys.argv[2]
+        elif sys.argv[1] == '-m':
+            master = sys.argv[2]
+        sys.argv = sys.argv[2:]
+    main(fname,master) 

@@ -218,7 +218,7 @@ tamed void Paxos_Proposer::send_heartbeat() {
 
     n = ports.size();
 
-    req = RPC_Msg(Json::array(HEARTBEAT,me_->epoch_));
+    req = RPC_Msg(Json::array(HEARTBEAT,me_->epoch_,me_->master_));
 
     // Send to all (with a node timeout);
     for (i=0; i<n; ++i) {
@@ -227,21 +227,31 @@ tamed void Paxos_Proposer::send_heartbeat() {
                                            r.make_event(i,resp[i].json())) );
     }
     // Wait for responses, and grab timing info
-    // FIXME: what if something never responds?
     for( i=0; i<n; ++i) {
       twait(r,ret);
       t1s[ret] = Telemetry::time();
+      // if this has an epoch number that is behind
+      INFO() << resp[ret].content();
+      if (resp[ret].content()[0].is_s())
+      if (resp[ret].content()[0].as_s() == "NACK") {
+        WARN() << "no longer master";
+        assert(resp[ret].content().size() == 3 
+               && resp[ret].content()[1].is_i() 
+               && resp[ret].content()[2].is_i());
+        me_->master_ = resp[ret].content()[1].as_i();
+        me_->epoch_ = resp[ret].content()[2].as_i();
+      }
     }
 
     // Average RTT's and update estimate for this round
     sum = 0;
     for( i=0; i<n; ++i ) {
       diff = t1s[i] - t0s[i];
-      DATA () << "difference : " << diff;
       sum += diff;
-      if (diff >= me_->heartbeat_timeout_ * 1000) // make sure to convert heartbeat_timeout_ to same as Telemetry::time()
+      if (diff >= me_->heartbeat_timeout_ * 1000) {// make sure to convert heartbeat_timeout_ to same as Telemetry::time()
+        DATA () << "difference : " << diff;
         results[i] = ETIMEDOUT;
-      else 
+      } else 
         results[i] = 0;
     }
     me_->telemetry_.update_rtt_estimate( sum/n );
@@ -286,16 +296,23 @@ tamed void Paxos_Acceptor::handle_request(tamer::fd cfd) {
         twait { mpfd.read_request(make_event(req.json())); }
         if (!req.content().is_a() || req.content().size() < 2
             || !req.content()[0].is_i() || !req.content()[1].is_i()) {
-            INFO() << "bad RPC: " << req.content();;
+            INFO() << "bad RPC: " << req.content();
             break;
         }
         if (me_->stopped_)
             continue;
-        if (me_->epoch_ > req.content()[1].as_i()) {// ignore request; proposer should time out and realize it's behind
+        if (me_->epoch_ > req.content()[1].as_i()) {
             INFO() << "proposer's epoch number is behind in acceptor " << port << ": " << req.content();
+            // respond with updated info
+            res = RPC_Msg(Json::array("NACK",me_->master_,me_->epoch_),req);
+            mpfd.write(res);
             continue;
-        } if (me_->epoch_ < req.content()[1].as_i()) // if I am behind, catch me up
-            me_->epoch_  = req.content()[1].as_i();
+        } if (me_->epoch_ < req.content()[1].as_i()) {// if I am behind, catch me up
+            INFO() << "epoch behind in " << port << ": changing to " << req.content()[1].as_i();
+            me_->epoch_ = req.content()[1].as_i();
+            me_->master_ = req.content()[2].as_i();
+            me_->master_change_.make_event().trigger();
+        }
         // heartbeat
         me_->elect_me_.make_event(false).trigger();
         switch(req.content()[0].as_i()) {
@@ -381,10 +398,6 @@ tamed void Paxos_Acceptor::decided(modcomm_fd& mpfd, RPC_Msg& req) {
 
 tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
     tvars { RPC_Msg res; }
-    if (me_->epoch_ != req.content()[1].as_i()) {
-        INFO() << "epoch behind in " << port << ": changing to " << req.content()[1].as_i();
-        me_->epoch_ = req.content()[1].as_i();
-    }
     res = RPC_Msg(Json::array("ACK"),req);
     mpfd.write(res);
 }
@@ -407,7 +420,7 @@ tamed void Paxos_Server::run_server() {
     INFO () << "starting paxos server";
     // FIXME: paxos sync start event wait goes here
     twait { paxos_init(make_event()); }
-    twait { tamer::at_delay_msec(rand_int(0,1000),make_event()); }
+    // twait { tamer::at_delay_msec(rand_int(0,1000),make_event()); }
     listen_for_master_change();
     INFO() << "Now listening for master change";
     if (master_ < 0) 
@@ -556,7 +569,7 @@ tamed void Paxos_Server::listen_for_master_change() {
 tamed void Paxos_Server::beating_heart(tamer::event<> ev) {
     while (i_am_master()) {
         if (!stopped_) {
-            INFO() << "Paxos_Server sending heartbeat " << paxos_port_;
+            INFO() << paxos_port_ << " Paxos_Server sending heartbeat. epoch: " << epoch_;
             // Do not wait. Let the heartbeats go on their own.
             // We need to send another round in hb_freq_ ms,
             // regardless of whether these are done.

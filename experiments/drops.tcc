@@ -34,9 +34,13 @@ tamed void run() {
     for (i = 0; i < n; ++i)
         ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config,master);
 
-    twait {at_delay(5,make_event()); }
-    ps[1]->stop();
+    twait {at_delay(3,make_event()); }
+    ps[0]->stop();
     twait {at_delay(2,make_event()); }
+    ps[0]->start();
+    // stop next master
+    ps[ps[1]->master_-15900]->stop();
+    twait {at_delay(5,make_event()); }
     DATA () << "[True Drops] : " << Telemetry::true_drops_;
     DATA () << "[Perceived Drops] : " << Telemetry::perceived_drops_;
 
