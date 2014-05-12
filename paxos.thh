@@ -235,9 +235,7 @@ public:
     void start() {
         stopped_ = false;
     }
-    void stop() {
-        stopped_ = true;
-    }
+    void stop();
     int who_is_master() {
         return master_;
     }

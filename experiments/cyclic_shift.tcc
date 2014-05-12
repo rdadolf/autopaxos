@@ -49,7 +49,6 @@ tamed void run() {
   for (i = 0; i < n; ++i) 
     config.push_back(Json::array(server_port_s + i, paxos_port_s + i));
 
-  system("rm -rf *_persist");
   for (i = 0; i < n; ++i)
     ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config,master);
   

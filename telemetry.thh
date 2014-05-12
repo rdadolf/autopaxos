@@ -1,7 +1,12 @@
+#ifndef _TELEMETRY_H_
+#define _TELEMETRY_H_
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include "log.hh"
+#include "json.hh"
+
 
 class Telemetry {
 public: // [RDA]: Changed so experiments have access.
@@ -15,11 +20,14 @@ public: // [RDA]: Changed so experiments have access.
   // Master Drop Counter
   int64_t epoch_counter_;
   uint64_t master_drop_mtbf_;
+  // vector with elements of [time,is_master?]
+  static Json true_drops_; // true drops are noted when the node is stopped using the stop message
+  static Json perceived_drops_;
 
 public:
   Telemetry() {
     rtt_estimate_ = 0;
-    epoch_counter_ = 1;
+    epoch_counter_ = 0;
   }
   ~Telemetry() { }
 
@@ -41,8 +49,13 @@ public:
 
   void master_drop_event(int epoch)
   {
-    if( epoch>=epoch_counter_ ) {
+    if( epoch > epoch_counter_ ) { // only want this is we haven't already done a master_drop event
       // FIXME: update MTBF somehow
+      Json d = Json::array(Telemetry::time(),true);
+      Telemetry::perceived_drops_.push_back(d);
+      epoch_counter_ = epoch;
     }
   }
 };
+
+#endif // _TELEMETRY_H_

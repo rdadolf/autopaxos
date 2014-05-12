@@ -7,6 +7,7 @@
 
 #include "paxos.hh"
 #include "network.hh"
+#include "telemetry.hh"
 using namespace paxos;
 
 int rand_int(double min, double max) {
@@ -206,10 +207,13 @@ tamed void Paxos_Proposer::send_heartbeat() {
       tamer::event<> e;
       std::vector<int>::size_type i;
       std::vector<int> results(n);
-      tamer::rendezvous<> r;
+      tamer::rendezvous<int> r;
       struct timeval t;
       std::vector<uint64_t> t0s(n), t1s(n);
       uint64_t sum;
+      Json d; // for pushing new data to telemetry
+      int ret; // returned index on twait
+      int diff;
     }
 
     n = ports.size();
@@ -220,19 +224,25 @@ tamed void Paxos_Proposer::send_heartbeat() {
     for (i=0; i<n; ++i) {
       t0s[i] = Telemetry::time();
       mpfd[i].call( req, with_timeout_msec(me_->heartbeat_timeout_,
-                                           r.make_event(resp[i].json())) );
+                                           r.make_event(i,resp[i].json())) );
     }
-
     // Wait for responses, and grab timing info
+    // FIXME: what if something never responds?
     for( i=0; i<n; ++i) {
-      twait(r);
-      t1s[i] = Telemetry::time(); // FIXME: These may not be in order. (problem?)
+      twait(r,ret);
+      t1s[ret] = Telemetry::time();
     }
 
     // Average RTT's and update estimate for this round
     sum = 0;
     for( i=0; i<n; ++i ) {
-      sum += t1s[i] - t0s[i];
+      diff = t1s[i] - t0s[i];
+      DATA () << "difference : " << diff;
+      sum += diff;
+      if (diff >= me_->heartbeat_timeout_ * 1000) // make sure to convert heartbeat_timeout_ to same as Telemetry::time()
+        results[i] = ETIMEDOUT;
+      else 
+        results[i] = 0;
     }
     me_->telemetry_.update_rtt_estimate( sum/n );
 
@@ -240,8 +250,9 @@ tamed void Paxos_Proposer::send_heartbeat() {
     for( i=0; i<n; ++i ) {
       if( results[i]==0 ) {
         // response received
-      } else if( results[i]==-ETIMEDOUT ) {
-        // timeout
+      } else if( results[i]== ETIMEDOUT ) {
+        d = Json::array(t1s[i],false);
+        Telemetry::perceived_drops_.push_back(d);
       } else {
         // signal
       }
@@ -493,12 +504,8 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
         twait { receive_request(request.content()[1],make_event(res)); }
         reply = RPC_Msg(res,request);
       } else if( request.content()[0]=="stop" ) {
-        stopped_ = true;
-        if( i_am_master() ) {
-          DATA() << "MASTER " << paxos_port_ << " DEAD";
-        }
+        stop();
         reply = RPC_Msg(Json::array("ACK"),request);
-        INFO() << "server " << listen_port_ << " stopping.";
       } else if( request.content()[0]=="start" ) {
         stopped_ = false;
         reply = RPC_Msg(Json::array("ACK"),request);
@@ -512,6 +519,22 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
     }
     twait { mpfd.write(reply, make_event()); }
   }
+}
+
+Json Telemetry::true_drops_; // true drops are noted when the node is stopped using the stop message
+Json Telemetry::perceived_drops_;
+
+void Paxos_Server::stop(){
+    stopped_ = true;
+    Json d = Json::make_array();
+    d.push_back(Telemetry::time());
+    if( i_am_master() ) {
+        DATA() << "MASTER " << paxos_port_ << " DEAD";
+        d.push_back(true);
+    } else 
+        d.push_back(false);
+    Telemetry::true_drops_.push_back(d);
+    INFO() << "server " << listen_port_ << " stopping.";
 }
 
 tamed void Paxos_Server::elect_me(tamer::event<Json> ev) {
