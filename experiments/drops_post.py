@@ -29,11 +29,11 @@ def main(file,master):
 
 if __name__ == '__main__':
     fname = "log.txt"
-    master = True
+    master = False
     while len(sys.argv) > 2: 
         if sys.argv[1] == "-n":
             fname = sys.argv[2]
         elif sys.argv[1] == '-m':
-            master = sys.argv[2]
+            master = True if sys.argv[2] == "True" else False
         sys.argv = sys.argv[2:]
     main(fname,master) 

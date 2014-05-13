@@ -153,11 +153,8 @@ tamed void Paxos_Proposer::propose(int n, Json v, tamer::event<> done) {
             i--;
             continue;
         }
-        if (!res[ret].content()[0].is_i()) {
-            INFO() << res[ret].content();
-            abort();
-        }
-        if (res[ret].content()[0].as_i() != PREPARED) 
+        if (!res[ret].content()[0].is_i() 
+            || res[ret].content()[0].as_i() != PREPARED) 
             --i;
         else {
             assert(res[ret].content()[1].is_i());
