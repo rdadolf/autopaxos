@@ -18,6 +18,7 @@ telemetry.hh
 experiments/track_rtt
 experiments/cyclic_shift
 experiments/*.cc
+experiments/*.png
 autopaxos.aux
 autopaxos.bbl
 autopaxos.blg

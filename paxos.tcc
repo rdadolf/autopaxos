@@ -8,6 +8,7 @@
 #include "paxos.hh"
 #include "network.hh"
 #include "telemetry.hh"
+#include "goodness.hh"
 using namespace paxos;
 
 int rand_int(double min, double max) {
@@ -429,6 +430,7 @@ tamed void Paxos_Server::run_server() {
     INFO() << "Past master check";
     listen_for_heartbeats();
     INFO() << "Now listening for heartbeats";
+    policy_decision(); // updating my hbf and mto
     handle_new_connections();
 }
 
@@ -616,4 +618,21 @@ tamed void Paxos_Server::receive_request(Json args, tamer::event<Json> ev) {
         twait { proposer_->run_instance(req,make_event(*ev.result_pointer())); }
     }
     ev.unblock();
+}
+tamed void Paxos_Server::policy_decision() {
+    tvars {
+        double g,C_r(10),C_hb(1);
+        std::pair<double,double> params;
+    }
+    while (1) {
+        twait { at_delay_msec(2000,make_event()); } // FIXME: arbitrary delay
+        g = goodness(heartbeat_freq_, Telemetry::mtbf_, master_timeout_, 
+                    Telemetry::rtt_estimate_/2, C_r, C_hb);
+        // eventually for updated hbf and mto
+        /*params = get_best_params(50, 1000, 50, 100, 2000, 100,
+                                 Telemetry::mtbf_, Telemetry::rtt_estimate_/2, C_r, C_hb);
+        heartbeat_freq_ = params.first;
+        master_timeout_ = params.second;*/
+        DATA() << "[goodness]: " << g;
+    }
 }

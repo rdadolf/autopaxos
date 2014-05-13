@@ -41,7 +41,7 @@ MPRPC_HDR=mprpc/msgpack.hh mprpc/.deps/mpfd.hh mprpc/string.hh mprpc/straccum.hh
 MPRPC = $(MPRPC_SRC) $(MPRPC_HDR) $(MPRPC_OBJ)
 
 COMMON_OBJ=network.o paxos.o
-COMMON_HDR=log.hh network.hh paxos.hh client.hh telemetry.hh brand.h
+COMMON_HDR=log.hh network.hh paxos.hh client.hh telemetry.hh brand.h goodness.hh
 COMMAND_DIR := commands
 
 default: main nnodes $(COMMAND_DIR)/server_command experiments
