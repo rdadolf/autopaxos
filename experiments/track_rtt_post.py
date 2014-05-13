@@ -32,6 +32,7 @@ rcParams['font.weight'] = 100
 #   Actual latency changes => latency
 #   Master RTT estimates => e_rtt
 #   Heartbeat events => hb
+#   Heartbeat frequency => hbfreq
 # 
 # Data format:
 #   np.array( [ [time, event], ... ] )
@@ -40,6 +41,7 @@ def parse_events(file):
   latency = []
   e_rtt = []
   hb = []
+  hbfreq = 0
 
   for line in [raw.strip() for raw in file.readlines()]:
     m = re.match('(\d+\.\d+).*DATA: Latency set to: (\d+)', line)
@@ -54,12 +56,17 @@ def parse_events(file):
     if m is not None:
       hb.append( (float(m.group(1)), 1) )
 
+    m = re.match('.*DATA: Heartbeat frequency set to: (\d+)', line)
+    if m is not None:
+      hbfreq = float(m.group(1))
+
   t0 = min(latency[0][0], e_rtt[0][0], hb[0][0])
   return ( np.array([(t-t0,x) for (t,x) in latency]),
            np.array([(t-t0,x) for (t,x) in e_rtt]),
-           np.array([(t-t0,x) for (t,x) in hb]))
+           np.array([(t-t0,x) for (t,x) in hb]),
+           hbfreq )
 
-def plot_events(latency, e_rtt, hb):
+def plot_events(latency, e_rtt, hb, hbfreq):
   (fig,ax) = plt.subplots()
 
   # Turn latency into a step function
@@ -76,10 +83,12 @@ def plot_events(latency, e_rtt, hb):
   ax.axvline(hb[0,0],ls=':',color=rgb(196,196,196),label='Heartbeat Messages')
   for (t,_) in hb[1:]:
     ax.axvline(t,ls=':',color=rgb(196,196,196))
+  print hbfreq
+  ax.axhline(hbfreq,ls='--',color=rgb(196,196,196))
   t_max = max(np.max(latency[:,0]),np.max(e_rtt[:,0]),np.max(hb[:,0]))
   ax.set_xlim((0,t_max))
   ax.set_xlabel(r'Time')
-  ax.set_ylabel(r'Latency ($\mu$s)')
+  ax.set_ylabel(r'Latency (ms)')
   ax.set_title(r'Tracking performance of RTT Estimator')
   ax.legend(loc=2)
   fig.tight_layout()
@@ -90,7 +99,7 @@ if __name__=='__main__':
     file=open(sys.argv[1])
   else:
     file=sys.stdin
-  (latency, e_rtt, hb) = parse_events(file)
-  (fig,ax) = plot_events(latency, e_rtt, hb)
+  (latency, e_rtt, hb, hbfreq) = parse_events(file)
+  (fig,ax) = plot_events(latency, e_rtt, hb, hbfreq)
   fig.savefig('track_rtt_plot.png')
   
