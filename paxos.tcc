@@ -259,8 +259,9 @@ tamed void Paxos_Proposer::send_heartbeat() {
       if( results[i]==0 ) {
         // response received
       } else if( results[i]== ETIMEDOUT ) {
-        d = Json::array(t1s[i],false);
-        Telemetry::perceived_drops_.push_back(d);
+        Telemetry::drop_event(t1s[i]);
+        //d = Json::array(t1s[i],false);
+        //Telemetry::perceived_drops_.push_back(d);
       } else {
         // signal
       }
@@ -404,8 +405,8 @@ tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
 Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     listen_port_ = port;
     master_ = master;
-    master_timeout_ = 1000;
-    heartbeat_freq_ = 300; // was originally master_timeout_/2
+    master_timeout_ = 500;
+    heartbeat_freq_ = 200; // was originally master_timeout_/2
     heartbeat_timeout_ = master_timeout_;
     epoch_ = (master_ < 0) ? 0 : 1;
     config_ = config;
@@ -463,7 +464,7 @@ tamed void Paxos_Server::listen_for_heartbeats() {
     if (em) {
       elect_me_.clear();
       INFO() << "master timed out " << paxos_port_;
-      telemetry_.master_drop_event(epoch_);
+      Telemetry::master_drop_event(epoch_, Telemetry::time());
       master_ = -1;
       twait { elect_me(tamer::make_event(j)); }
     } else 
@@ -532,11 +533,18 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
   }
 }
 
-Json Telemetry::true_drops_; // true drops are noted when the node is stopped using the stop message
-Json Telemetry::perceived_drops_;
+//Json Telemetry::true_drops_; // true drops are noted when the node is stopped using the stop message
+//Json Telemetry::perceived_drops_;
+
+int64_t Telemetry::epoch_counter_ = 0;
+int Telemetry::last_drop_ = 0;
+int Telemetry::n_drops_ = 0;
+uint64_t Telemetry::mtbf_ = 1000;
+uint64_t *Telemetry::drop_times_ = NULL;
 
 void Paxos_Server::stop(){
     stopped_ = true;
+    /*
     Json d = Json::make_array();
     d.push_back(Telemetry::time());
     if( i_am_master() ) {
@@ -545,6 +553,7 @@ void Paxos_Server::stop(){
     } else 
         d.push_back(false);
     Telemetry::true_drops_.push_back(d);
+    */
     INFO() << "server " << listen_port_ << " stopping.";
 }
 

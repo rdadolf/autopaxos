@@ -16,18 +16,23 @@ public: // [RDA]: Changed so experiments have access.
 
   // RTT Estimator
   uint64_t rtt_estimate_; // usecs
+  // FIXME: make static
 
-  // Master Drop Counter
-  int64_t epoch_counter_;
-  uint64_t master_drop_mtbf_;
+  // Drop Counter
+  static int64_t epoch_counter_;
+  static const int drop_window_ = 10;
+  static int last_drop_;
+  static int n_drops_;
+  static uint64_t *drop_times_;
+  static uint64_t mtbf_;
   // vector with elements of [time,is_master?]
-  static Json true_drops_; // true drops are noted when the node is stopped using the stop message
-  static Json perceived_drops_;
+  //uint64_t master_drop_mtbf_;
+  //static Json true_drops_; // true drops are noted when the node is stopped using the stop message
+  //static Json perceived_drops_;
 
 public:
   Telemetry() {
     rtt_estimate_ = 0;
-    epoch_counter_ = 0;
   }
   ~Telemetry() { }
 
@@ -47,15 +52,31 @@ public:
                              << " [with] " << new_estimate;
   }
 
-  void master_drop_event(int epoch)
+  static void drop_event(uint64_t when)
+  {
+    int i;
+    DATA() << "Detected node drop event";
+    if( n_drops_==0 ) {
+      mtbf_ = 1000; // reasonable default
+      drop_times_ = (uint64_t *)malloc(drop_window_*sizeof(uint64_t));
+      memset(drop_times_, 0, drop_window_*sizeof(uint64_t));
+    }
+    drop_times_[last_drop_] = when;
+    ++n_drops_;
+    if( n_drops_>=drop_window_ ) {
+      int oldest = (last_drop_+1)%drop_window_;
+      mtbf_ = (drop_times_[last_drop_] - drop_times_[oldest])/drop_window_;
+    }
+    last_drop_ = (last_drop_+1)%drop_window_;
+  }
+  static void master_drop_event(int epoch, uint64_t when)
   {
     if( epoch > epoch_counter_ ) { // only want this is we haven't already done a master_drop event
-      // FIXME: update MTBF somehow
-      Json d = Json::array(Telemetry::time(),true);
-      Telemetry::perceived_drops_.push_back(d);
       epoch_counter_ = epoch;
+      drop_event(when);
     }
   }
+
 };
 
 #endif // _TELEMETRY_H_
