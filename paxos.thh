@@ -246,6 +246,7 @@ public:
     tamed void handle_new_connections();
     tamed void read_and_dispatch(tamer::fd client);
     tamed void receive_request(Json args, tamer::event<Json> ev);
+    tamed void policy_decision();
 
     // Paxos functions
     tamed void elect_me(tamer::event<Json> ev);
