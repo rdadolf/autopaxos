@@ -41,7 +41,8 @@ bool get_ip_address( uint32_t ip_addr, struct in_addr &host )
 ////////////////////////////////////////////////////////////////////////////////
 // modcomm functions
 
-unsigned int modcomm_fd::delay_ = 0;
+unsigned int modcomm_fd::send_delay_ = 0;
+unsigned int modcomm_fd::recv_delay_ = 0;
 uint64_t modcomm_fd::data_transferred_ = 0;
 
 void modcomm_fd::initialize( tamer::fd cfd )
@@ -59,15 +60,21 @@ tamed void modcomm_fd::call( Json msg, tamer::event<Json> ev )
     Json reply;
   }
 
-  INFO() << "(CALL1): " << msg;
+  //INFO() << "(CALL1): " << msg;
   data_transferred_ += 1; // FIXME: currently a packet counter
-  twait { tamer::at_delay_msec(modcomm_fd::delay_, make_event()); }
+  twait { tamer::at_delay_msec(modcomm_fd::send_delay_, make_event()); }
   twait { mpfd_.call( msg, make_event(reply) );  }
   // This second delay is the read delay on the reply
   // An RTT should be 2*delay_.
-  twait { tamer::at_delay_msec(modcomm_fd::delay_, make_event()); }
+  twait { tamer::at_delay_msec(modcomm_fd::recv_delay_, make_event()); }
   data_transferred_ += 1; // FIXME: currently a packet counter
   ev(reply);
+}
+
+tamed void modcomm_fd::write( Json msg )
+{
+  tvars { }
+  twait{ write(msg, make_event()); }
 }
 
 tamed void modcomm_fd::write( Json msg, tamer::event<> ev )
@@ -76,9 +83,9 @@ tamed void modcomm_fd::write( Json msg, tamer::event<> ev )
     int x;
   }
 
-  INFO() << "(WRITE): " << msg;
+  //INFO() << "(WRITE): " << msg;
   data_transferred_ += 1; // FIXME: currently a packet counter
-  twait { tamer::at_delay_msec(modcomm_fd::delay_, make_event()); }
+  twait { tamer::at_delay_msec(modcomm_fd::send_delay_, make_event()); }
   mpfd_.write( msg );
 
   ev();
@@ -91,8 +98,8 @@ tamed void modcomm_fd::read_request( tamer::event<Json> ev )
   }
 
   twait { mpfd_.read_request(make_event(response)); }
-  twait { tamer::at_delay_msec(modcomm_fd::delay_, make_event()); }
-  INFO() << "(READ): " << response;
+  twait { tamer::at_delay_msec(modcomm_fd::recv_delay_, make_event()); }
+  //INFO() << "(READ): " << response;
   data_transferred_ += 1; // FIXME: currently a packet counter
 
   ev(response);

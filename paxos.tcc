@@ -8,6 +8,7 @@
 #include "paxos.hh"
 #include "network.hh"
 #include "telemetry.hh"
+#include "goodness.hh"
 using namespace paxos;
 
 int rand_int(double min, double max) {
@@ -245,8 +246,9 @@ tamed void Paxos_Proposer::send_heartbeat() {
     for( i=0; i<n; ++i ) {
       diff = t1s[i] - t0s[i];
       sum += diff;
+      INFO() << "RTT measurement: " << diff;
       if (diff >= me_->heartbeat_timeout_ * 1000) {// make sure to convert heartbeat_timeout_ to same as Telemetry::time()
-        DATA () << "difference : " << diff;
+        DATA () << "RTT telemetry timeout. Node "<<i<<" dropped, RTT estimate set to " << diff;
         results[i] = ETIMEDOUT;
       } else 
         results[i] = 0;
@@ -403,7 +405,7 @@ tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
 Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     listen_port_ = port;
     master_ = master;
-    master_timeout_ = 500;
+    master_timeout_ = 1000;
     heartbeat_freq_ = 300; // was originally master_timeout_/2
     heartbeat_timeout_ = master_timeout_;
     epoch_ = (master_ < 0) ? 0 : 1;
@@ -427,6 +429,7 @@ tamed void Paxos_Server::run_server() {
     INFO() << "Past master check";
     listen_for_heartbeats();
     INFO() << "Now listening for heartbeats";
+    policy_decision(); // updating my hbf and mto
     handle_new_connections();
 }
 
@@ -606,4 +609,21 @@ tamed void Paxos_Server::receive_request(Json args, tamer::event<Json> ev) {
         twait { proposer_->run_instance(req,make_event(*ev.result_pointer())); }
     }
     ev.unblock();
+}
+tamed void Paxos_Server::policy_decision() {
+    tvars {
+        double g,C_r(10),C_hb(1);
+        std::pair<double,double> params;
+    }
+    while (1) {
+        twait { at_delay_msec(2000,make_event()); } // FIXME: arbitrary delay
+        g = goodness(heartbeat_freq_, Telemetry::mtbf_, master_timeout_, 
+                    Telemetry::rtt_estimate_/2, C_r, C_hb);
+        // eventually for updated hbf and mto
+        /*params = get_best_params(50, 1000, 50, 100, 2000, 100,
+                                 Telemetry::mtbf_, Telemetry::rtt_estimate_/2, C_r, C_hb);
+        heartbeat_freq_ = params.first;
+        master_timeout_ = params.second;*/
+        DATA() << "[goodness]: " << g;
+    }
 }

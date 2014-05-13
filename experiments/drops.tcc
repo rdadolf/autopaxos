@@ -32,7 +32,7 @@ tamed void start_changing_latency(const int delay, const int min_value, const in
       at_delay_msec(delay, make_event());
     }
     rand_latency = ( brand(&br_state) % (max_value-min_value) ) + min_value;
-    modcomm_fd::set_delay(rand_latency);
+    modcomm_fd::set_send_delay(rand_latency);
     DATA() << "Latency set to: " << rand_latency;
   }
 
@@ -59,6 +59,8 @@ tamed void run(const int delay, const int min_freq, const int max_freq) {
 
     for (i = 0; i < n; ++i)
         ps[i] = new Paxos_Server(server_port_s + i, paxos_port_s + i, config,master);
+    modcomm_fd::set_send_delay(0);
+    DATA() << "Latency set to: " << 0;
 
     // tests for not stopping the master
     for (i = 0; i < 7 ; ++i) {
