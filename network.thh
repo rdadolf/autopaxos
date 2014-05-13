@@ -34,7 +34,8 @@ bool get_ip_address( uint32_t ip_addr, struct in_addr &host );
 
 class modcomm_fd {
 private:
-  static unsigned int delay_;
+  static unsigned int send_delay_;
+  static unsigned int recv_delay_;
   msgpack_fd mpfd_;
   static uint64_t data_transferred_; // #FIXME: currently a packet counter
 public:
@@ -43,15 +44,20 @@ public:
     initialize(cfd);
   }
 
-  static void set_delay(unsigned int delay) {
-    INFO() << "Modcomm delay set to " << delay;
-    delay_ = delay;
+  static void set_send_delay(unsigned int delay) {
+    send_delay_ = delay;
+    INFO() << "Modcomm send delay set to " << delay;
+  }
+
+  static void set_recv_delay(unsigned int delay) {
+    recv_delay_ = delay;
+    INFO() << "Modcomm recv delay set to " << delay;
   }
 
   void initialize( tamer::fd cfd );
   void clear();
   tamed void call( Json msg, tamer::event<Json> ev );
-  inline void write(Json msg);
+  tamed void write(Json msg);
   tamed void write( Json msg, tamer::event<> ev );
   tamed void read_request( tamer::event<Json> ev );
 
@@ -61,8 +67,5 @@ public:
   static uint64_t data_transferred() { return data_transferred_; }
 };
 
-inline void modcomm_fd::write(Json msg) {
-  mpfd_.write(msg);
-}
 
 #endif

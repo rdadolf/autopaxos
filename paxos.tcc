@@ -245,8 +245,9 @@ tamed void Paxos_Proposer::send_heartbeat() {
     for( i=0; i<n; ++i ) {
       diff = t1s[i] - t0s[i];
       sum += diff;
+      INFO() << "RTT measurement: " << diff;
       if (diff >= me_->heartbeat_timeout_ * 1000) {// make sure to convert heartbeat_timeout_ to same as Telemetry::time()
-        DATA () << "difference : " << diff;
+        DATA () << "RTT telemetry timeout. Node "<<i<<" dropped, RTT estimate set to " << diff;
         results[i] = ETIMEDOUT;
       } else 
         results[i] = 0;
@@ -403,7 +404,7 @@ tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
 Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     listen_port_ = port;
     master_ = master;
-    master_timeout_ = 500;
+    master_timeout_ = 1000;
     heartbeat_freq_ = 300; // was originally master_timeout_/2
     heartbeat_timeout_ = master_timeout_;
     epoch_ = (master_ < 0) ? 0 : 1;

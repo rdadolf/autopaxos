@@ -50,7 +50,7 @@ tamed void modulate_latency(const int delay, const int min_value, const int max_
   while(1) {
     twait { at_delay_msec(delay, make_event()); }
     rand_latency = ( brand(&br_state) % (max_value-min_value) ) + min_value;
-    modcomm_fd::set_delay(rand_latency);
+    modcomm_fd::set_send_delay(rand_latency);
     DATA() << "Latency set to: " << rand_latency;
   }
 
@@ -80,12 +80,15 @@ tamed void run() {
   // Server configuration and no-election startup
   for (i = 0; i < n; ++i) 
     config.push_back(Json::array(server_port_s + i, paxos_port_s + i));
-  modcomm_fd::set_delay(MOD_MIN_DELAY);
+  modcomm_fd::set_send_delay(MOD_MIN_DELAY);
+  modcomm_fd::set_recv_delay(0);
+  DATA() << "Latency set to: " << MOD_MIN_DELAY;
   for (i=0; i<n; ++i) {
     ps[i] = new Paxos_Server(server_port_s+i, paxos_port_s+i, config, master);
     ps[i]->master_timeout_ = 1000000;//never
     ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
   }
+  DATA() << "Heartbeat frequency set to: " << HEARTBEAT_INTERVAL;
 
   // Experiment
   modulate_latency(CHANGE_DELAY, MOD_MIN_DELAY, MOD_MAX_DELAY);
