@@ -23,7 +23,7 @@ using namespace paxos;
 
 // Experimental constants
 const int MOD_MIN_DELAY = 10;
-const int MOD_MAX_DELAY = 300;
+const int MOD_MAX_DELAY = 200;
 const int CHANGE_DELAY = 2000;
 const int SAMPLE_DELAY = 50;
 const int HEARTBEAT_INTERVAL = 150;
@@ -61,7 +61,6 @@ tamed void run() {
     int n(3),server_port_s(15800),paxos_port_s(15900),i;
     std::vector<Paxos_Server*> ps(n);
     Json config = Json::make_array();
-    uint64_t data;
     int master(15900);    // paxos ports start at 15900
     int master_index = 0; // so master is the first one
     // Experiment variables
@@ -89,6 +88,7 @@ tamed void run() {
     ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
   }
   DATA() << "Heartbeat frequency set to: " << HEARTBEAT_INTERVAL;
+  twait { at_delay_msec(1000, make_event()); }
 
   // Experiment
   modulate_latency(CHANGE_DELAY, MOD_MIN_DELAY, MOD_MAX_DELAY);
