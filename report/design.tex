@@ -3,15 +3,38 @@
 % For TeXShop on OS X and Herbert Schulz's latexmk engine.
 
 \section{Design}
-
+Our design of the system included the implementation of a \texttt{Paxos\_Server} class that contained within it the components of Paxos---the \texttt{Paxos\_Acceptors} and \texttt{Paxos\_Proposers}.  Each \texttt{Paxos\_Server} contained within it the different parameters to be set and used.  As development progressed, it became clear that the lines between each Paxos component (acceptor and proposer) and the server were blurring, so in future development, these distinctions will likely be removed.
 \subsection{Measurement}
+In order to sufficiently be able to make adjusts for the changing environment, the environment first had to be measured.  In order to accomplish this, we introduced the \texttt{Telemetry} class.  The \texttt{Telemetry} class has components to track the different measures of our environment of which we were interested including its latency and node failure rates.  In order to ensure that all members of the quorum maintain the same constants, static methods of the \texttt{Telemetry} class were used.
+
 % latency
+\texttt{Telemetry} contains an average round-trip time (RTT) measure used to estimate the average network latency.  The current master calculates the average RTT from sending its heartbeat to all of the nodes in the quorum, then it updates the overall estimated RTT in Telemetry which is subsequently used to calculate the latency (RTT / 2). %FIXME: more details--update_rtt_estimate
+
 % failure
+Failures are tracked in a similar way to the RTT: each time a node thinks a failure has occurred, it updates a statically global failure tracker in \texttt{Telemetry}.  This happens in two settings:
+\begin{enumerate}
+	\item The master notices a node's failure when sending a heartbeat from its response timing out.
+	\item A node notices a master's failure from a master's timeout.
+\end{enumerate}
+In either case, there can be either true failures and false failures, but nodes cannot tell the difference; both are thus recorded in \texttt{Telemetry}.  The distinction is made, though, between perceived master failures and perceived node failures (with the latter being a perceived master failure).
 
 \subsection{Policy}
 % policy = minimize cost
 % explain cost models (uptime, traffic, recovery)
+We defined our policy of adjustment to minimize the cost of continued recoveries (re-elections) and messages (heartbeats).  This was assessed in the form of calculating a particular environment's "goodness."  We defined goodness to be the uptime of the Paxos system divided by the traffic of the system: $Goodness = \frac{uptime}{traffic}$.  In this way, we calculated Goodness in the following way:
+\begin{equation}
+	Goodness = \frac
+	{F_{mf}  T_{to}}
+	{2 (F_{hb}C_{hb} + False\_fail C_r)}
+\end{equation}
+where $F_{mf}$ is the mean time between failures (MTBF), $T_{to}$ is the master timeout constant, $F_{hb}$ is the heartbeat frequency, $C_{hb}$ is the cost of sending a heartbeat, $False\_fail$ is the false failure rate, and $C_r$ is the cost of recovery---that is, the cost of recovering from a master failure.
+
+Further, $False\_fail$ is defined by the cumulative density function of $F_{hb}, T_l,$ and $T_{to}$:
+\begin{equation}
+	False\_fail = CDF ( \frac{1}{F_{hb}} + T_l - T_{to} )
+\end{equation}
 
 \subsection{Adaptation}
 % adjust HB freq
+Using this measure of goodness, each node in the quorum measures its environment adjusts its own parameters accordingly.  It accomplishes this by using the \texttt{Telemetry} class to get the measure of the network latency and master failure rate and then iteratively testing a [window] of values to determine values of the heartbeat frequency and master timeouts that result in the highest possible goodness for the current environment.
 % proactively push measurement info
