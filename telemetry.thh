@@ -24,10 +24,8 @@ public: // [RDA]: Changed so experiments have access.
   static int n_drops_;
   static uint64_t *drop_times_;
   static uint64_t mtbf_; // usecs
-  // vector with elements of [time,is_master?]
-  //uint64_t master_drop_mtbf_;
-  //static Json true_drops_; // true drops are noted when the node is stopped using the stop message
-  //static Json perceived_drops_;
+  static int n_nodes_;
+  static bool *drop_history_; // dropped recently
 
 public:
   Telemetry() { }
@@ -59,12 +57,19 @@ public:
     now = time();
     for(i=0;i<drop_window_;i++)
       drop_times_[i] = now - mtbf_;
+    assert( n_nodes_>0 && "Telemetry must be informed of the node count" );
+    drop_history_ = (bool *)malloc(n_nodes_*sizeof(bool));
+    memset(drop_history_, 0, n_nodes_*sizeof(bool));
   }
 
-  static void drop_event(uint64_t when)
+  static void drop_event(uint64_t when, int who)
   {
     if( n_drops_==0 )
       initialize_drops();
+
+    if( drop_history_[who] )
+      return;
+    drop_history_[who] = true;
 
     // Otherwise, it's the first time
     DATA() << "Detected node drop event";
@@ -77,11 +82,19 @@ public:
     last_drop_ = (last_drop_+1)%drop_window_;
   }
 
-  static void master_drop_event(int epoch, uint64_t when)
+  static void live_event(int who)
+  {
+    if( n_drops_==0 )
+      initialize_drops();
+
+    drop_history_[who] = false;
+  }
+
+  static void master_drop_event(int epoch, uint64_t when, int who)
   {
     if( epoch > epoch_counter_ ) { // only want this is we haven't already done a master_drop event
       epoch_counter_ = epoch;
-      drop_event(when);
+      drop_event(when, who);
     }
   }
 

@@ -20,14 +20,14 @@
 using namespace paxos;
 
 // Experimental constants
-const int DROP_MIN_INTERVAL = 300;
-const int DROP_MAX_INTERVAL = 600;
-const int MOD_MIN_DELAY = 10;
+const int DROP_MIN_INTERVAL = 1000;
+const int DROP_MAX_INTERVAL = 1500;
+const int MOD_MIN_DELAY = 100;
 const int MOD_MAX_DELAY = 200;
-const int CHANGE_DELAY = 5000;
+const int CHANGE_DELAY = 10000;
 const int SAMPLE_DELAY = 50;
-const int HEARTBEAT_INTERVAL = 150;
-const int TIMEOUT_INTERVAL = 500;
+const int HEARTBEAT_INTERVAL = 280;
+const int TIMEOUT_INTERVAL = 880;
 const int N_STEPS = 5;
 // Experimental state
 uint64_t failure_interval = 1000;
@@ -63,6 +63,7 @@ tamed void sample_policy(const int delay)
   while(1) {
     twait { at_delay_msec(delay, make_event()); }
     T_bf = 1000./double(Telemetry::mtbf_);
+    //T_bf = failure_interval; //FIXME: Cheating
     T_l = double(Telemetry::rtt_estimate_)/2000.;
     //DATA() << "PMetric Estimate: pmetric("<<T_hb<<", "<<T_bf<<", "<<T_to<<", "<<T_l<<", "<<C_r<<", "<<C_hb<<")";
     DATA() << "PMetric Estimate: " << pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb);

@@ -220,6 +220,8 @@ tamed void Paxos_Proposer::send_heartbeat() {
 
     req = RPC_Msg(Json::array(HEARTBEAT,me_->epoch_,me_->master_));
 
+    Telemetry::live_event(0); // FIXME: wrong
+
     // Send to all (with a node timeout);
     for (i=0; i<n; ++i) {
       t0s[i] = Telemetry::time();
@@ -261,8 +263,11 @@ tamed void Paxos_Proposer::send_heartbeat() {
     for( i=0; i<n; ++i ) {
       if( results[i]==0 ) {
         // response received
+        Telemetry::live_event(i);
+        //INFO() << "Heartbeat received on port "<<ports[i]<< "(node "<<i<<")";
       } else if( results[i]== ETIMEDOUT ) {
-        Telemetry::drop_event(t1s[i]);
+        Telemetry::drop_event(t1s[i], i); // FIXME: second arg may be fragile?
+        //INFO() << "Heartbeat timeout on port "<<ports[i]<< "(node "<<i<<")";
         //d = Json::array(t1s[i],false);
         //Telemetry::perceived_drops_.push_back(d);
       } else {
@@ -442,6 +447,7 @@ tamed void Paxos_Server::paxos_init(tamer::event<> ev){
         tamer::event<> e;
         std::vector<int> paxi;
     }
+    Telemetry::n_nodes_ = config_.size();
     for (int i = 0; i < config_.size(); ++i) {
         assert(config_[i].is_a() && config_[i][0].is_i() && config_[i][1].is_i());
         paxi.push_back(config_[i][1].as_i());
@@ -468,7 +474,7 @@ tamed void Paxos_Server::listen_for_heartbeats() {
     if (em) {
       elect_me_.clear();
       INFO() << "master timed out " << paxos_port_;
-      Telemetry::master_drop_event(epoch_, Telemetry::time());
+      Telemetry::master_drop_event(epoch_, Telemetry::time(), 0); // FIXME: wrong
       master_ = -1;
       twait { elect_me(tamer::make_event(j)); }
     } else 
@@ -547,6 +553,8 @@ int Telemetry::last_drop_ = 0;
 int Telemetry::n_drops_ = 0;
 uint64_t Telemetry::mtbf_ = 1000000;
 uint64_t *Telemetry::drop_times_ = NULL;
+int Telemetry::n_nodes_ = -1;
+bool *Telemetry::drop_history_ = NULL;
 
 void Paxos_Server::stop(){
     stopped_ = true;
@@ -630,6 +638,7 @@ tamed void Paxos_Server::policy_decision() {
     }
     while (1) {
         twait { at_delay_msec(2000,make_event()); } // FIXME: arbitrary delay
+        // FIXME: THIS IS ALL WRONG
         p = pmetric(heartbeat_freq_, Telemetry::mtbf_, master_timeout_, 
                     Telemetry::rtt_estimate_/2, C_r, C_hb);
         // eventually for updated hbf and mto
