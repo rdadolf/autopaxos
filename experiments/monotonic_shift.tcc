@@ -31,7 +31,7 @@ const int TIMEOUT_INTERVAL = 1000;
 const int EFFICACY_WINDOW = 1000;
 const int N_STEPS = 20;
 // Experimental state
-uint64_t failure_interval = 1000;
+uint64_t failure_interval = 2000;
 
 tamed void sample_rtt_estimate(const int delay)
 {
@@ -93,10 +93,10 @@ tamed void modulate_latency(const int delay, const int min_value, const int max_
   }
 
   for( latency=min_value; latency<=max_value; latency+=(max_value-min_value)/N_STEPS ) {
-    //modcomm_fd::set_send_delay(latency);
-    modcomm_fd::set_send_delay( (max_value+min_value)/2 );
-    //DATA() << "Latency set to: " << latency;
-    DATA() << "Latency set to: " << (max_value+min_value)/2;
+    modcomm_fd::set_send_delay(latency);
+    // modcomm_fd::set_send_delay( (max_value+min_value)/2 );
+    DATA() << "Latency set to: " << latency;
+    // DATA() << "Latency set to: " << (max_value+min_value)/2;
     twait { at_delay_msec(delay, make_event()); }
   }
 }
@@ -181,8 +181,8 @@ tamed void run() {
   DATA() << "Latency set to: " << 10;
   for (i=0; i<n; ++i) {
     ps[i] = new Paxos_Server(server_port_s+i, paxos_port_s+i, config, master);
-    ps[i]->master_timeout_ = TIMEOUT_INTERVAL;
-    //ps[i]->master_timeout_ = 1000000; // always wait for master to come back
+    // ps[i]->master_timeout_ = TIMEOUT_INTERVAL;
+    ps[i]->master_timeout_ = 1000000; // always wait for master to come back
     ps[i]->heartbeat_interval_ = HEARTBEAT_INTERVAL;
   }
   DATA() << "Heartbeat interval set to: " << HEARTBEAT_INTERVAL;

@@ -48,7 +48,7 @@ static inline double pmetric( double T_hb, // Heartbeat interval
   // P_ff Gaussian latency model (std=100ms)
   P_ff = cdf( T_hb+T_l-T_to, 0, 100 );
   double P_tf;
-  P_tf = exp(-1000./T_bf);
+  P_tf = exp(-1000./(T_bf + T_l));
   uptime = 1 - P_tf - P_ff;
 
   double traffic;

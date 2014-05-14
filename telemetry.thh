@@ -97,7 +97,6 @@ public:
       drop_event(when, who);
     }
   }
-
 };
 
 #endif // _TELEMETRY_H_

@@ -84,10 +84,6 @@ def parse_events(file):
     if m is not None:
       hb.append( (float(m.group(1)), 1) )
 
-    m = re.match('(\d+\.\d+).*DATA: Stopped node .*', line)
-    if m is not None:
-      drop.append( (float(m.group(1)), 1) )
-
     m = re.match('(\d+\.\d+).*DATA: RTT telemetry timeout.*', line)
     if m is not None:
       e_drop.append( (float(m.group(1)), 1) )
@@ -162,7 +158,7 @@ def plot_events(mtbf, e_mtbf, latency, e_latency, hb, e_pmet, traf, starts, stop
   #ax.axhline(mtbf[0,1], color=cb2[0], label='Actual MTBF' )
   #ax.plot( mtbf_step_t, mtbf_step_v, color=cb2[0], label='Actual MTBF' )
   ax.plot( latency_step_t, latency_step_v, color=cb2[1], label='Actual Latency' )
-  ax.axvline(e_drop[0,0],ls=':',color='k',alpha=0.2, label='Node drops')
+  ax.axvline(e_drop[0,0],ls=':',color='k',alpha=0.2, label='Node drops') # FIXME: should we highlight master drops
   for (t,_) in e_drop[1:]:
     ax.axvline(t,ls=':',color='k',alpha=0.2)
 
@@ -192,7 +188,44 @@ def plot_events(mtbf, e_mtbf, latency, e_latency, hb, e_pmet, traf, starts, stop
   # traffic is measured directly
   # ratio is efficacy
   # FIXME: do this
+  tl = 0 # last time
+  uptimes = []
+  for (t,x) in traf:
+    # get just this window
+    up = 0
+    n = 0
+    strts_ = filter(lambda (t_,_): t_ > tl and t_ < t,starts)
+    stps_ = filter(lambda (t_,_): t_ > tl and t_ < t,stops)
+    # no stops here
+    if len(stps_) is 0:
+      uptimes.append(t - tl)
+      tl = t
+      continue
+    # difference at the length should be off by 1 at most
+    assert (len(strts_) == len(stps_) or abs(len(strts_) - len(stps_)) == 1) 
+    if len(strts_) is 0:
+      uptimes.append(stps_[0][0] - tl)
+      tl = stps_[0][0] # should only have length of 1
+      continue
+    # downtime is the time when a master is down until there is re-election
+    j = 0
+    for i,(ts,n) in enumerate(stps_):
+      if j < len(strts_):
+        tstrt = strts_[j][0]
+        if tstrt < ts:
+          up += ts - tstrt
+          j += 1
+        else :
+          assert(j is 0) # this should only happen at the beginning
+          up += ts - tl
+      else:
+        up += ts - strts_[j - 1][0] # this should only happen at the end
 
+    uptimes.append(up / len(stps_))
+    tl = t
+  print "uptimes",len(uptimes)
+  goodness = np.array(uptimes)/traf[:,0]
+  ax.plot(traf[:,0],goodness * 1000,color='k',label='Goodness')
 
   # Polish off plot
   #t_max = max(np.max(mtbf[:,0]),np.max(latency[:,0]),np.max(hb[:,0]),np.max(e_pmet[:,0]),np.max(eff[:,0]))
