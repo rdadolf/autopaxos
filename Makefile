@@ -61,7 +61,6 @@ main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
 nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
 
-#EXPERIMENTS=experiments/monotonic_shift
 EXPERIMENTS=experiments/track_rtt experiments/monotonic_shift experiments/track_drops experiments/track_policy
 experiments: $(EXPERIMENTS)
 

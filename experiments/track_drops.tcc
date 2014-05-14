@@ -19,13 +19,13 @@
 using namespace paxos;
 
 // Experimental constants
-const int DROP_MIN_INTERVAL = 300;
+const int DROP_MIN_INTERVAL = 400;
 const int DROP_MAX_INTERVAL = 600;
-const int CHANGE_DELAY = 2000;
+const int CHANGE_DELAY = 5000;
 const int SAMPLE_DELAY = 50;
 const int HEARTBEAT_INTERVAL = 150;
 const int TIMEOUT_INTERVAL = 500;
-const int N_STEPS = 8;
+const int N_STEPS = 15;
 // Experimental state
 uint64_t failure_interval = 1000;
 
@@ -88,7 +88,7 @@ tamed void randomly_fail(std::vector<Paxos_Server*> ps, const int n)
 
 tamed void run() {
   tvars {
-    int n(7),server_port_s(15800),paxos_port_s(15900),i;
+    int n(5),server_port_s(15800),paxos_port_s(15900),i;
     std::vector<Paxos_Server*> ps(n);
     Json config = Json::make_array();
     int master(15900);
@@ -112,9 +112,9 @@ tamed void run() {
   for (i=0; i<n; ++i) {
     ps[i] = new Paxos_Server(server_port_s+i, paxos_port_s+i, config, master);
     ps[i]->master_timeout_ = 1000000;//never
-    ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
+    ps[i]->heartbeat_interval_ = HEARTBEAT_INTERVAL;
   }
-  DATA() << "Heartbeat frequency set to: " << HEARTBEAT_INTERVAL;
+  DATA() << "Heartbeat interval set to: " << HEARTBEAT_INTERVAL;
   twait { at_delay_msec(1000, make_event()); }
 
   // Experiment
