@@ -24,11 +24,11 @@ const int DROP_MIN_INTERVAL = 1000;
 const int DROP_MAX_INTERVAL = 1500;
 const int MOD_MIN_DELAY = 100;
 const int MOD_MAX_DELAY = 200;
-const int CHANGE_DELAY = 10000;
+const int CHANGE_DELAY = 20000;
 const int SAMPLE_DELAY = 50;
 const int HEARTBEAT_INTERVAL = 280;
 const int TIMEOUT_INTERVAL = 880;
-const int N_STEPS = 5;
+const int N_STEPS = 10;
 // Experimental state
 uint64_t failure_interval = 1000;
 
@@ -54,15 +54,15 @@ tamed void sample_policy(const int delay)
 {
   tvars { 
     double T_hb = double(HEARTBEAT_INTERVAL);
-    double T_bf;      // MTBF estimate, in Hz
+    double T_bf;      // MTBF estimate, in us
     double T_to = double(TIMEOUT_INTERVAL);
-    double T_l;       // Latency estimate, in ms
+    double T_l;       // Latency estimate, in us
     double C_r = 20.; // Recovery cost, in packets
     double C_hb = 2.; // Heartbeat cost, in packets
   }
   while(1) {
     twait { at_delay_msec(delay, make_event()); }
-    T_bf = 1000./double(Telemetry::mtbf_);
+    T_bf = double(Telemetry::mtbf_)/1000.;
     //T_bf = failure_interval; //FIXME: Cheating
     T_l = double(Telemetry::rtt_estimate_)/2000.;
     //DATA() << "PMetric Estimate: pmetric("<<T_hb<<", "<<T_bf<<", "<<T_to<<", "<<T_l<<", "<<C_r<<", "<<C_hb<<")";
@@ -173,9 +173,9 @@ tamed void run() {
     ps[i] = new Paxos_Server(server_port_s+i, paxos_port_s+i, config, master);
     //ps[i]->master_timeout_ = TIMEOUT_INTERVAL;
     ps[i]->master_timeout_ = 1000000; // always wait for the master to come back
-    ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
+    ps[i]->heartbeat_interval_ = HEARTBEAT_INTERVAL;
   }
-  DATA() << "Heartbeat frequency set to: " << HEARTBEAT_INTERVAL;
+  DATA() << "Heartbeat interval set to: " << HEARTBEAT_INTERVAL;
   twait { at_delay_msec(1000, make_event()); }
 
   // Experiment

@@ -85,9 +85,9 @@ tamed void run() {
   for (i=0; i<n; ++i) {
     ps[i] = new Paxos_Server(server_port_s+i, paxos_port_s+i, config, master);
     ps[i]->master_timeout_ = 1000000;//never
-    ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
+    ps[i]->heartbeat_interval_ = HEARTBEAT_INTERVAL;
   }
-  DATA() << "Heartbeat frequency set to: " << HEARTBEAT_INTERVAL;
+  DATA() << "Heartbeat interval set to: " << HEARTBEAT_INTERVAL;
   twait { at_delay_msec(1000, make_event()); }
 
   // Experiment
