@@ -78,19 +78,19 @@ def plot_events(latency, e_rtt, hb, hbfreq):
   latency_step_l[::2] = latency[:,1]
   latency_step_l[1::2]= latency[:,1]
 
-  ax.plot( latency_step_t, latency_step_l, color=cb2[0], label='Actual Latency' )
-  ax.plot( e_rtt[:,0], e_rtt[:,1]/2000., color=cb2[1], label='Estimated Latency' )
-  ax.axvline(hb[0,0],ls=':',color=rgb(196,196,196),label='Heartbeat Messages')
-  for (t,_) in hb[1:]:
-    ax.axvline(t,ls=':',color=rgb(196,196,196))
-  print hbfreq
-  ax.axhline(hbfreq,ls='--',color=rgb(196,196,196))
+  ax.plot( latency_step_t, latency_step_l, color=cb2[1], label='Actual Latency' )
+  ax.plot( e_rtt[:,0], e_rtt[:,1]/2000., color=cb2[5], label='Estimated Latency' )
+  #ax.axvline(hb[0,0],ls=':',color=rgb(196,196,196),label='Heartbeat Messages')
+  #for (t,_) in hb[1:]:
+  #  ax.axvline(t,ls=':',color=rgb(196,196,196))
+  #print hbfreq
+  #ax.axhline(hbfreq,ls='--',color=rgb(196,196,196))
   t_max = max(np.max(latency[:,0]),np.max(e_rtt[:,0]),np.max(hb[:,0]))
   ax.set_xlim((0,t_max))
   ax.set_xlabel(r'Time')
   ax.set_ylabel(r'Latency (ms)')
   ax.set_title(r'Tracking performance of RTT Estimator')
-  ax.legend(loc=2)
+  ax.legend(loc=4)
   fig.tight_layout()
   return (fig,ax)
 

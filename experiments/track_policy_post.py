@@ -35,11 +35,6 @@ rcParams['font.weight'] = 100
 #   Detected drop events => e_drop
 #   Actual MTBF set points => mtbf
 #   MTBF estimates => e_mtbf
-# 
-# Data format:
-#   np.array( [ [time, event], ... ] )
-
-# Relevant plotting events:
 #   Actual latency changes => latency
 #   Master RTT estimates => e_rtt
 #   Heartbeat events => hb
@@ -89,11 +84,11 @@ def parse_events(file):
     if m is not None:
       hb.append( (float(m.group(1)), 1) )
 
-    m = re.match('(\d+\.\d+).*DATA: PMetric Estimate: ([-\d\.]+)', line)
+    m = re.match('(\d+\.\d+).*DATA: PMetric estimate before tuning: ([-\d\.]+)', line)
     if m is not None:
       e_pmet.append( (float(m.group(1)), float(m.group(2))) )
 
-    m = re.match('.*DATA: Heartbeat frequency set to: ([\d]+)', line)
+    m = re.match('.*DATA: Heartbeat interval set to: ([\d]+)', line)
     if m is not None:
       hbfreq = float(m.group(1))
 
@@ -140,7 +135,7 @@ def plot_events(drop, e_drop, mtbf, e_mtbf, latency, e_rtt, hb, e_pmet, hbfreq):
   ax.plot( e_rtt[:,0], e_rtt[:,1]/2000., color=cb2[5], label='Estimated Latency' )
   # Overlay the estimated, theoretical, and measured policy metric
   axG = ax.twinx();
-  axG.plot( e_pmet[:,0], e_pmet[:,1], color=cb2[3], label='Estimated PMetric')
+  axG.plot( e_pmet[:,0], e_pmet[:,1], color=cb2[7], label='Estimated PMetric')
   pmet = np.empty(e_pmet.shape)
   pmet[:,0] = e_pmet[:,0]
   T_hb = 280. # program constant
@@ -151,16 +146,18 @@ def plot_events(drop, e_drop, mtbf, e_mtbf, latency, e_rtt, hb, e_pmet, hbfreq):
   C_hb = 2.  # approximation for cost of one heartbeat
   #print ( F_hb, F_mf, T_to, T_l, C_r, C_hb )
   pmet[:,1] = goodplot.pmetric( T_hb, T_bf, T_to, T_l, C_r, C_hb )
-  axG.plot( pmet[:,0], pmet[:,1], color=cb2[2], label='Theoretical PMetric')
+  axG.plot(pmet[:,0], pmet[:,1], color=cb2[3], label='Theoretical PMetric')
   # FIXME: empirical pmet
 
   # Polish off plot
   t_max = max(np.max(drop[:,0]),np.max(e_drop[:,0]),np.max(mtbf[:,0]), np.max(e_mtbf[:,0]), np.max(latency[:,0]),np.max(e_rtt[:,0]),np.max(hb[:,0]))
   ax.set_xlim((0,t_max))
   ax.set_xlabel(r'Time')
-  ax.set_ylabel(r'ms')
+  ax.set_ylabel(r'Latency and MTBF (ms)')
+  axG.set_ylabel(r'PMetric')
   ax.set_title('Tracking policy accuracy')
   #ax.legend(loc=2)
+  #axG.legend()
   fig.tight_layout()
   return (fig,ax)
 
