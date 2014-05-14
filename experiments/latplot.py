@@ -29,35 +29,13 @@ rcParams['font.weight'] = 100
 # ^^^^^ MPL Boilerplate ^^^^^
 ################################################################################
 
-def pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb):
-  # UPTIME
-  # True failure detection & recovery
-  #   (MTBF - blindWin+electionWin)
-  # False failure recovery
-  #   (1-P_ff) * electionWin
-  # P_ff Fixed latency model
-  #P_ff = (T_hb+T_l) > T_to
-  # P_ff Gaussian latency model (std=100ms)
-  P_ff = scipy.stats.norm.cdf( T_hb+T_l-T_to, loc=0, scale=100 )
-
-  # TRAFFIC
-  # Heartbeat overhead
-  #   C_hb/T_hb
-  # True failure recovery
-  #   C_r/T_bf
-  # False failure recovery
-  #   P_ff * C_r
-  
-  uptime = T_bf - ((T_to/2+T_l) + 4*T_l) + (1-P_ff)*(4*T_l)
-  traffic= C_hb/T_hb + C_r/T_bf + P_ff*C_r
-  return uptime/traffic
-  
+import goodplot
 
 if __name__=='__main__':
 
-  T_hb = 280.
-  T_bf = 1200. # MTBF (ms)
-  T_to = 1000. # master timeout, in ms
+  #T_hb = 280.
+  T_bf = 1000. # MTBF (ms)
+  #T_to = 1000. # master timeout, in ms
   #T_l = 150. # latency, in ms
   C_r = 20. # recovery cost, in packets
   C_hb = 2. # heartbeat cost, in packets
@@ -65,9 +43,9 @@ if __name__=='__main__':
   T_l = (np.linspace(50,500,200))  
 
   (fig,ax) = plt.subplots()
-  for T_hb in np.linspace(100,800,8):
+  for T_hb in np.linspace(50,800,8):
     for T_to in np.linspace(800,1600,8):
-      p = pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb)
+      p = goodplot.pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb)
       ax.plot(T_l, p, label=r'$T_{to}$='+str(T_to))
   #ax.axvline(T_bf,color='k',label=r'$T_{bf}$')
   ax.set_xlabel(r'Latency ($T_{l}$)')
