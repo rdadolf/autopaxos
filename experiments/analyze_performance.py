@@ -187,7 +187,6 @@ def plot_events(mtbf, e_mtbf, latency, e_latency, hb, e_pmet, traf, starts, stop
   # first, compute uptime per traffic window
   # traffic is measured directly
   # ratio is efficacy
-  # FIXME: do this
   tl = 0 # last time
   uptimes = []
   for (t,x) in traf:
