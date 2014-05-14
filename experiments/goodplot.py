@@ -29,7 +29,7 @@ rcParams['font.weight'] = 100
 # ^^^^^ MPL Boilerplate ^^^^^
 ################################################################################
 
-def g(T_hb, T_bf, T_to, T_l, C_r, C_hb):
+def pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb):
   # UPTIME
   # True failure detection & recovery
   #   (MTBF - blindWin+electionWin)
@@ -63,9 +63,9 @@ if __name__=='__main__':
   C_hb = 2. # heartbeat cost, in packets
   (fig,ax) = plt.subplots()
   for T_to in np.linspace(500,4000,8):
-    goodness = g(T_hb, T_bf, T_to, T_l, C_r, C_hb)
-    ax.plot(T_hb, goodness, label=r'$T_{TO}$='+str(T_to))
-    print T_hb[np.argmax(goodness)], np.max(goodness)
+    p = pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb)
+    ax.plot(T_hb, p, label=r'$T_{TO}$='+str(T_to))
+    print T_hb[np.argmax(p)], np.max(p)
   ax.axvline(T_bf,color='k',label=r'$T_{BF}$')
   ax.set_xlabel('Heartbeat interval')
   ax.set_ylabel('Goodness')

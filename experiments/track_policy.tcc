@@ -15,7 +15,7 @@
 #include "paxos.hh"
 #include "client.hh"
 #include "telemetry.hh"
-#include "goodness.hh"
+#include "policy.hh"
 
 using namespace paxos;
 
@@ -53,19 +53,19 @@ tamed void sample_mtbf(const int delay)
 tamed void sample_policy(const int delay)
 {
   tvars { 
-    double F_hb = 1./double(HEARTBEAT_INTERVAL);
-    double F_mf = 0.; // MTBF estimate, in Hz
+    double T_hb = double(HEARTBEAT_INTERVAL);
+    double T_bf;      // MTBF estimate, in Hz
     double T_to = double(TIMEOUT_INTERVAL);
-    double T_l = 0.; // Latency estimate, in ms
+    double T_l;       // Latency estimate, in ms
     double C_r = 20.; // Recovery cost, in packets
     double C_hb = 2.; // Heartbeat cost, in packets
   }
   while(1) {
     twait { at_delay_msec(delay, make_event()); }
-    F_mf = 1000./double(Telemetry::mtbf_);
+    T_bf = 1000./double(Telemetry::mtbf_);
     T_l = double(Telemetry::rtt_estimate_)/2000.;
-    //DATA() << "Goodness Estimate: goodness("<<F_hb<<", "<<F_mf<<", "<<T_to<<", "<<T_l<<", "<<C_r<<", "<<C_hb<<")";
-    DATA() << "Goodness Estimate: " << goodness(F_hb, F_mf, T_to, T_l, C_r, C_hb);
+    //DATA() << "PMetric Estimate: pmetric("<<T_hb<<", "<<T_bf<<", "<<T_to<<", "<<T_l<<", "<<C_r<<", "<<C_hb<<")";
+    DATA() << "PMetric Estimate: " << pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb);
   }
 }
 
@@ -170,7 +170,8 @@ tamed void run() {
   DATA() << "Latency set to: " << 10;
   for (i=0; i<n; ++i) {
     ps[i] = new Paxos_Server(server_port_s+i, paxos_port_s+i, config, master);
-    ps[i]->master_timeout_ = TIMEOUT_INTERVAL;
+    //ps[i]->master_timeout_ = TIMEOUT_INTERVAL;
+    ps[i]->master_timeout_ = 1000000; // always wait for the master to come back
     ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
   }
   DATA() << "Heartbeat frequency set to: " << HEARTBEAT_INTERVAL;

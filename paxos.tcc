@@ -8,7 +8,7 @@
 #include "paxos.hh"
 #include "network.hh"
 #include "telemetry.hh"
-#include "goodness.hh"
+#include "policy.hh"
 using namespace paxos;
 
 int rand_int(double min, double max) {
@@ -188,7 +188,9 @@ tamed void Paxos_Proposer::accept(int n, tamer::event<> done) {
 
     for (i = 0; i < (unsigned)(f + 1); ++i) {
         twait(r,ret);
-        assert(res[ret].content()[0].is_i() && res[ret].content()[1].is_i());
+        //assert(res[ret].content()[0].is_i() && res[ret].content()[1].is_i());
+        if( res[ret].content()[0].is_i() && res[ret].content()[1].is_i() )
+          --i;
         n = res[ret].content()[1].as_i();
         if (res[ret].content()[0].as_i() != ACCEPTED || n != n_p) // should not count this one
             --i;
@@ -623,18 +625,18 @@ tamed void Paxos_Server::receive_request(Json args, tamer::event<Json> ev) {
 }
 tamed void Paxos_Server::policy_decision() {
     tvars {
-        double g,C_r(20),C_hb(2);
+        double p,C_r(20),C_hb(2);
         std::pair<double,double> params;
     }
     while (1) {
         twait { at_delay_msec(2000,make_event()); } // FIXME: arbitrary delay
-        g = goodness(heartbeat_freq_, Telemetry::mtbf_, master_timeout_, 
+        p = pmetric(heartbeat_freq_, Telemetry::mtbf_, master_timeout_, 
                     Telemetry::rtt_estimate_/2, C_r, C_hb);
         // eventually for updated hbf and mto
         /*params = get_best_params(50, 1000, 50, 100, 2000, 100,
                                  Telemetry::mtbf_, Telemetry::rtt_estimate_/2, C_r, C_hb);
         heartbeat_freq_ = params.first;
         master_timeout_ = params.second;*/
-        DATA() << "[goodness]: " << g;
+        DATA() << "[pmetric]: " << p;
     }
 }
