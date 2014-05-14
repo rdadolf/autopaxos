@@ -54,21 +54,24 @@ def pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb):
   
 
 if __name__=='__main__':
-  T_hb = (np.linspace(10,2000,200))
-  
+
+  T_hb = 280.
   T_bf = 1200. # MTBF (ms)
-  #T_to = 1000. # master timeout, in ms
-  T_l = 200. # latency, in ms
+  T_to = 1000. # master timeout, in ms
+  #T_l = 150. # latency, in ms
   C_r = 20. # recovery cost, in packets
   C_hb = 2. # heartbeat cost, in packets
+
+  T_l = (np.linspace(50,500,200))  
+
   (fig,ax) = plt.subplots()
-  for T_to in np.linspace(400,1600,6):
-    p = pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb)
-    ax.plot(T_hb, p, label=r'$T_{to}$='+str(T_to))
-    print T_hb[np.argmax(p)], np.max(p)
-  ax.axvline(T_bf,color='k',label=r'$T_{bf}$')
-  ax.set_xlabel(r'Heartbeat interval ($T_{hb}$)')
+  for T_hb in np.linspace(100,800,8):
+    for T_to in np.linspace(800,1600,8):
+      p = pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb)
+      ax.plot(T_l, p, label=r'$T_{to}$='+str(T_to))
+  #ax.axvline(T_bf,color='k',label=r'$T_{bf}$')
+  ax.set_xlabel(r'Latency ($T_{l}$)')
   ax.set_ylabel('PMetric')
-  ax.legend()
-  fig.savefig('good.png')
+  #ax.legend()
+  fig.savefig('lat.png')
   

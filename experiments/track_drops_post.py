@@ -80,7 +80,7 @@ def plot_events(drop, e_drop, mtbf, e_mtbf):
   mtbf_step_v[1::2]= mtbf[:,1]
 
   ax.plot( mtbf_step_t, mtbf_step_v, color=cb2[0], label='Actual MTBF' )
-  ax.plot( e_mtbf[:,0], e_mtbf[:,1]/2000., color=cb2[1], label='Estimated MTBF' )
+  ax.plot( e_mtbf[:,0], e_mtbf[:,1]/1000., color=cb2[1], label='Estimated MTBF' )
 
   #for (t,_) in drop:
   #  ax.axvline(t,ls='--',color=rgb(196,196,196))
@@ -88,6 +88,7 @@ def plot_events(drop, e_drop, mtbf, e_mtbf):
     ax.axvline(t,ls=':',color=rgb(196,196,196))
   t_max = max(np.max(drop[:,0]),np.max(e_drop[:,0]),np.max(mtbf[:,0]), np.max(e_mtbf[:,0]))
   ax.set_xlim((0,t_max))
+  ax.set_ylim((0,1.2*max(np.max(mtbf[:,1]),np.max(e_mtbf[:,1]))/1000.))
   ax.set_xlabel(r'Time')
   ax.set_ylabel(r'MTBF (ms)')
   ax.set_title(r'Tracking performance of MTBF Estimator')
