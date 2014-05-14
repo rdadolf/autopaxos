@@ -189,8 +189,11 @@ tamed void Paxos_Proposer::accept(int n, tamer::event<> done) {
     for (i = 0; i < (unsigned)(f + 1); ++i) {
         twait(r,ret);
         //assert(res[ret].content()[0].is_i() && res[ret].content()[1].is_i());
-        if( res[ret].content()[0].is_i() && res[ret].content()[1].is_i() )
+        if( res[ret].content()[0].is_i() && res[ret].content()[1].is_i() ) {
           --i;
+          continue; // will get a json assertion error if this is allowed to go to the "n =" line, 
+                    // and the second member isn't an int
+        }
         n = res[ret].content()[1].as_i();
         if (res[ret].content()[0].as_i() != ACCEPTED || n != n_p) // should not count this one
             --i;
@@ -220,7 +223,7 @@ tamed void Paxos_Proposer::send_heartbeat() {
 
     req = RPC_Msg(Json::array(HEARTBEAT,me_->epoch_,me_->master_));
 
-    Telemetry::live_event(0); // FIXME: wrong
+    // Telemetry::live_event(0); // FIXME: wrong // this should be set by the heartbeat
 
     // Send to all (with a node timeout);
     for (i=0; i<n; ++i) {
@@ -234,9 +237,9 @@ tamed void Paxos_Proposer::send_heartbeat() {
       t1s[ret] = Telemetry::time();
       // if this has an epoch number that is behind
       INFO() << resp[ret].content();
-      if (resp[ret].content()[0].is_s())
-      if (resp[ret].content()[0].as_s() == "NACK") {
-        WARN() << "no longer master";
+      if (resp[ret].content()[0].is_s() 
+          && resp[ret].content()[0].as_s() == "NACK") {
+
         assert(resp[ret].content().size() == 3 
                && resp[ret].content()[1].is_i() 
                && resp[ret].content()[2].is_i());
@@ -474,7 +477,7 @@ tamed void Paxos_Server::listen_for_heartbeats() {
     if (em) {
       elect_me_.clear();
       INFO() << "master timed out " << paxos_port_;
-      Telemetry::master_drop_event(epoch_, Telemetry::time(), 0); // FIXME: wrong
+      Telemetry::master_drop_event(epoch_, Telemetry::time(), master_ - config_[0][1].as_i()); // FIXME: wrong
       master_ = -1;
       twait { elect_me(tamer::make_event(j)); }
     } else 
