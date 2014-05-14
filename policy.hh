@@ -56,16 +56,17 @@ static inline double pmetric( double T_hb, // Heartbeat interval
   // False failure recovery
   //   P_ff * C_r
   traffic= C_hb/T_hb + C_r/T_bf + P_ff*C_r;
-  
-  return uptime/traffic;
 
-  //double false_fail = cdf(0,100,1./F_hb + T_l - T_to);
-  //std::cerr << "F_hb: " << F_hb << "\n";
-  //std::cerr << "F_mf: " << F_mf << "\n";
+  //std::cerr << "T_hb: " << T_hb << "\n";
+  //std::cerr << "T_bf: " << T_bf << "\n";
   //std::cerr << "T_to: " << T_to << "\n";
   //std::cerr << "T_l:  " << T_l << "\n";
   //std::cerr << "C_r:  " << C_r << "\n";
   //std::cerr << "C_hb: " << C_hb << "\n";
+  
+  return uptime/traffic;
+
+  //double false_fail = cdf(0,100,1./F_hb + T_l - T_to);
   //return (F_mf * T_to) / (2*(F_hb*C_hb + false_fail*C_r));
 }
 
