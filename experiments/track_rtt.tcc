@@ -30,12 +30,12 @@ const int HEARTBEAT_INTERVAL = 150;
 const int N_STEPS = 8;
 
 
-tamed void sample_rtt_estimate(const int delay, Paxos_Server *master)
+tamed void sample_rtt_estimate(const int delay)
 {
   tvars { }
   while(1) {
     twait { at_delay_msec(delay, make_event()); }
-    DATA() << "Master RTT Estimate: " << master->telemetry_.rtt_estimate_;
+    DATA() << "Master RTT Estimate: " << Telemetry::rtt_estimate_;
   }
 }
 
@@ -92,7 +92,7 @@ tamed void run() {
 
   // Experiment
   modulate_latency(CHANGE_DELAY, MOD_MIN_DELAY, MOD_MAX_DELAY);
-  sample_rtt_estimate(SAMPLE_DELAY, ps[master_index]);
+  sample_rtt_estimate(SAMPLE_DELAY);
   twait { at_delay_msec(1000+CHANGE_DELAY*(N_STEPS+1), make_event()); }
 
   WARN() << "Breaking loop";

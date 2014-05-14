@@ -15,19 +15,31 @@
 #include "paxos.hh"
 #include "client.hh"
 #include "telemetry.hh"
+#include "goodness.hh"
 
 using namespace paxos;
 
 // Experimental constants
 const int DROP_MIN_INTERVAL = 300;
 const int DROP_MAX_INTERVAL = 600;
-const int CHANGE_DELAY = 2000;
+const int MOD_MIN_DELAY = 10;
+const int MOD_MAX_DELAY = 200;
+const int CHANGE_DELAY = 5000;
 const int SAMPLE_DELAY = 50;
 const int HEARTBEAT_INTERVAL = 150;
 const int TIMEOUT_INTERVAL = 500;
-const int N_STEPS = 8;
+const int N_STEPS = 5;
 // Experimental state
 uint64_t failure_interval = 1000;
+
+tamed void sample_rtt_estimate(const int delay)
+{
+  tvars { }
+  while(1) {
+    twait { at_delay_msec(delay, make_event()); }
+    DATA() << "Master RTT Estimate: " << Telemetry::rtt_estimate_;
+  }
+}
 
 tamed void sample_mtbf(const int delay)
 {
@@ -37,6 +49,44 @@ tamed void sample_mtbf(const int delay)
     DATA() << "MTBF Estimate: " << Telemetry::mtbf_;
   }
 }
+
+tamed void sample_policy(const int delay)
+{
+  tvars { 
+    double F_hb = 1./double(HEARTBEAT_INTERVAL);
+    double F_mf = 0.; // MTBF estimate, in Hz
+    double T_to = double(TIMEOUT_INTERVAL);
+    double T_l = 0.; // Latency estimate, in ms
+    double C_r = 20.; // Recovery cost, in packets
+    double C_hb = 2.; // Heartbeat cost, in packets
+  }
+  while(1) {
+    twait { at_delay_msec(delay, make_event()); }
+    F_mf = 1000./double(Telemetry::mtbf_);
+    T_l = double(Telemetry::rtt_estimate_)/2000.;
+    //DATA() << "Goodness Estimate: goodness("<<F_hb<<", "<<F_mf<<", "<<T_to<<", "<<T_l<<", "<<C_r<<", "<<C_hb<<")";
+    DATA() << "Goodness Estimate: " << goodness(F_hb, F_mf, T_to, T_l, C_r, C_hb);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+tamed void modulate_latency(const int delay, const int min_value, const int max_value)
+{
+  tvars {
+    brand_t br_state;
+  }
+  uint64_t rand_latency; // Temporary; no need to preserve in closure.
+
+  brand_init(&br_state, UINT64_C(80858175)); // event-loop-proof random numbers
+  while(1) {
+    twait { at_delay_msec(delay, make_event()); }
+    rand_latency = ( brand(&br_state) % (max_value-min_value) ) + min_value;
+    modcomm_fd::set_send_delay(rand_latency);
+    DATA() << "Latency set to: " << rand_latency;
+  }
+}
+
 
 tamed void fail_node(std::vector<Paxos_Server*> ps, const int i)
 {
@@ -93,14 +143,22 @@ tamed void run() {
     Json config = Json::make_array();
     int master(15900);
     int master_index = 0;
+    // Experiment variables
+    int latency_ms;
+    int timeout_value;
   }
 
   /*
-    Experiment: track_drops
-    Goal: compare detected to actual drops
+    Experiment: track_policy
+    Goal: compare estimated policy to actual values
     Procedure:
       Modulate failure rate over time.
+      Modulate latency over time.
+      Measure estimated RTT values.
       Measure estimated MTBF.
+      Compute goodness using known values.
+      Choose best parameters for estimated values.
+      Estimate goodness.
   */
 
   // Server configuration and no-election startup
@@ -121,6 +179,12 @@ tamed void run() {
   modulate_failure_rate(DROP_MIN_INTERVAL, DROP_MAX_INTERVAL);
   randomly_fail(ps, n);
   sample_mtbf(SAMPLE_DELAY);
+
+  modulate_latency(CHANGE_DELAY, MOD_MIN_DELAY, MOD_MAX_DELAY);
+  sample_rtt_estimate(SAMPLE_DELAY);
+
+  sample_policy(SAMPLE_DELAY);
+
   twait { at_delay_msec(1000+CHANGE_DELAY*(N_STEPS+1), make_event()); }
 
   WARN() << "Breaking loop";

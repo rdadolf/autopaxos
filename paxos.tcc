@@ -253,7 +253,7 @@ tamed void Paxos_Proposer::send_heartbeat() {
       } else 
         results[i] = 0;
     }
-    me_->telemetry_.update_rtt_estimate( sum/n );
+    Telemetry::update_rtt_estimate( sum/n );
 
     // Check status of all. FIXME: future functionality?
     for( i=0; i<n; ++i ) {
@@ -538,10 +538,12 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
 //Json Telemetry::true_drops_; // true drops are noted when the node is stopped using the stop message
 //Json Telemetry::perceived_drops_;
 
+uint64_t Telemetry::rtt_estimate_;
+
 int64_t Telemetry::epoch_counter_ = 0;
 int Telemetry::last_drop_ = 0;
 int Telemetry::n_drops_ = 0;
-uint64_t Telemetry::mtbf_ = 1000;
+uint64_t Telemetry::mtbf_ = 1000000;
 uint64_t *Telemetry::drop_times_ = NULL;
 
 void Paxos_Server::stop(){
@@ -621,7 +623,7 @@ tamed void Paxos_Server::receive_request(Json args, tamer::event<Json> ev) {
 }
 tamed void Paxos_Server::policy_decision() {
     tvars {
-        double g,C_r(10),C_hb(1);
+        double g,C_r(20),C_hb(2);
         std::pair<double,double> params;
     }
     while (1) {

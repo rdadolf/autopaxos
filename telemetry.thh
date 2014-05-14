@@ -11,12 +11,11 @@
 class Telemetry {
 public: // [RDA]: Changed so experiments have access.
   // Constants
-  static const uint64_t rtt_ewma_alpha_ = 80; // E(t) = (a)*RTT(t) + (1-a)*E(t-1)
+  static const uint64_t rtt_ewma_alpha_ = 70; // E(t) = (a)*RTT(t) + (1-a)*E(t-1)
   static const uint64_t rtt_ewma_norm_ = 100; // rtt_ewma_alpha demoninator
 
   // RTT Estimator
-  uint64_t rtt_estimate_; // usecs
-  // FIXME: make static
+  static uint64_t rtt_estimate_; // usecs
 
   // Drop Counter
   static int64_t epoch_counter_;
@@ -24,16 +23,14 @@ public: // [RDA]: Changed so experiments have access.
   static int last_drop_;
   static int n_drops_;
   static uint64_t *drop_times_;
-  static uint64_t mtbf_;
+  static uint64_t mtbf_; // usecs
   // vector with elements of [time,is_master?]
   //uint64_t master_drop_mtbf_;
   //static Json true_drops_; // true drops are noted when the node is stopped using the stop message
   //static Json perceived_drops_;
 
 public:
-  Telemetry() {
-    rtt_estimate_ = 0;
-  }
+  Telemetry() { }
   ~Telemetry() { }
 
   // RTT Estimator
@@ -42,7 +39,7 @@ public:
     gettimeofday(&tv, NULL);
     return UINT64_C(1000000)*tv.tv_sec + tv.tv_usec;
   }
-  void update_rtt_estimate(uint64_t new_estimate) {
+  static void update_rtt_estimate(uint64_t new_estimate) {
     uint64_t rtt_estimate_before = rtt_estimate_;
     // Calc EWMA
     rtt_estimate_ = ((rtt_ewma_alpha_)*new_estimate)/rtt_ewma_norm_
@@ -55,11 +52,14 @@ public:
   static void drop_event(uint64_t when)
   {
     int i;
+    uint64_t now;
     DATA() << "Detected node drop event";
     if( n_drops_==0 ) {
-      mtbf_ = 1000; // reasonable default
+      mtbf_ = 1000000; // reasonable default
       drop_times_ = (uint64_t *)malloc(drop_window_*sizeof(uint64_t));
-      memset(drop_times_, 0, drop_window_*sizeof(uint64_t));
+      now = time();
+      for(i=0;i<drop_window_;i++)
+        drop_times_[i] = now - mtbf_;
     }
     drop_times_[last_drop_] = when;
     ++n_drops_;

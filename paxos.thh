@@ -213,7 +213,7 @@ public: // [RDA]: Changed to expose state to experiments so we can poke things.
     bool stopped_;
 
     // Autopaxos stuff
-    Telemetry telemetry_;
+    //Telemetry telemetry_;
 
     // Paxos Stuff
     int paxos_port_;
