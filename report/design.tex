@@ -14,7 +14,7 @@
 \section{Design}
 We designed our model system around the same abstractions provided by Lamport in his original Paxos paper.
 Our system contains modules for Paxos proposers and accepters, as well as client-level server objects.
-While notionally separate entities, practically speaking the system can be viewed as a near-monolithic collection of coroutines written using the tamer \cite{tamer} event programming DSL.
+While notionally separate entities, practically speaking the system can be viewed as a near-monolithic collection of coroutines written using the tamer \cite{Krohn07} event programming DSL.
 
 We have not streamlined or optimized our implementation of Paxos.
 As previously mentioned, our goal is not to demonstrate the fastest or most efficient version of a distributed consensus;
