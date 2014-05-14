@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <iomanip> // setprecision
 #include <fstream>
 #include <unistd.h>
 #include <sys/time.h>
@@ -31,50 +32,35 @@ public:
     return ls;
   }
 
-  LogState &operator<< (String rhs) {
+  template<typename T>LogState &operator<< (T rhs) {
     logfile_ << rhs;
     logfile_.flush();
     return *this;
   }
 };
 
-// FIXME: Template this class so we don't have n versions of operator<<
-//      : buffer_ -> stringstream, template operator<<
 class LogInstance {
 private:
-  String buffer_;
+  std::stringstream buffer_;
   const char *mode_, *file_;
   int line_;
 public:
-  LogInstance(const char *mode, const char *file, const int line) : mode_(mode), file_(file), line_(line) {};
-  LogInstance& operator<< (String rhs) {
-    buffer_.append(rhs);
-    return *this;
+  LogInstance(const char *mode, const char *file, const int line) : mode_(mode), file_(file), line_(line), buffer_("") {
   }
-  LogInstance& operator<< (const char* rhs) {
-    buffer_.append(rhs);
-    return *this;
-  }
-  LogInstance& operator<< (int rhs) {
-    buffer_.append(String(rhs));
-    return *this;
-  }
-  LogInstance& operator<< (Json rhs) {
-    buffer_.append(rhs.unparse());
+
+  template<typename T> LogInstance& operator<< (T rhs) {
+    buffer_ << rhs;
     return *this;
   }
   ~LogInstance() {
     struct timeval tv;
-    char prefix[70];
-    String final_buffer;
 
     gettimeofday(&tv, 0);
-    snprintf(prefix, 70, "%ld.%06d [%d:%s:%d] %s: ",
-      tv.tv_sec, (int)tv.tv_usec, getpid(), file_, line_, mode_);
-    final_buffer += prefix;
-    final_buffer += buffer_;
-    final_buffer += "\n";
-    LogState::get() << final_buffer;
+    LogState::get() << std::fixed << std::setprecision(6)
+                    << double(tv.tv_sec*1000000+tv.tv_usec)/1000000.
+                    << std::setprecision(0)
+                    << " [" << getpid() << ":" << file_ << ":" << line_ << "] "
+                    << mode_ << ": " << buffer_.str() << "\n";
   }
 };
 
