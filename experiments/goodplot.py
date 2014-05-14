@@ -40,7 +40,7 @@ def pmetric(T_hb, T_bf, T_to, T_l, C_r, C_hb):
   # P_ff Gaussian latency model (std=100ms)
   P_ff = scipy.stats.norm.cdf( T_hb+T_l-T_to, loc=0, scale=100 )
   #P_tf = 1-scipy.stats.expon.cdf( 1, loc=0, scale=T_bf ) # scale = 1/lambda = 1/1/MTBF
-  P_tf = np.exp(-1000./T_bf)
+  P_tf = np.exp(-1000./(T_bf-T_l))
 
   # TRAFFIC
   # Heartbeat overhead
