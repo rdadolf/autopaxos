@@ -2,39 +2,93 @@
 % !TEX TS-program = pdflatexmk
 % For TeXShop on OS X and Herbert Schulz's latexmk engine.
 
+\newcommand{\Tbf}{T_{\mathit{bf}}}
+\newcommand{\Thb}{T_{\mathit{hb}}}
+\newcommand{\Tto}{T_{\mathit{to}}}
+\newcommand{\Tl}{T_{\mathit{l}}}
+\newcommand{\Cr}{C_{\mathit{r}}}
+\newcommand{\Chb}{C_{\mathit{hb}}}
+\newcommand{\Pff}{P_{\mathit{ff}}}
+\newcommand{\Ptf}{P_{\mathit{tf}}}
+
 \section{Design}
-Our design of the system included the implementation of a \texttt{Paxos\_Server} class that contained within it the components of Paxos---the \texttt{Paxos\_Acceptors} and \texttt{Paxos\_Proposers}.  Each \texttt{Paxos\_Server} contained within it the different parameters to be set and used.  As development progressed, it became clear that the lines between each Paxos component (acceptor and proposer) and the server were blurring, so in future development, these distinctions will likely be removed.
+We designed our model system around the same abstractions provided by Lamport in his original Paxos paper.
+Our system contains modules for Paxos proposers and accepters, as well as client-level server objects.
+While notionally separate entities, practically speaking the system can be viewed as a near-monolithic collection of coroutines written using the tamer \cite{tamer} event programming DSL.
+
+We have not streamlined or optimized our implementation of Paxos.
+As previously mentioned, our goal is not to demonstrate the fastest or most efficient version of a distributed consensus;
+instead, we show that our work can improve the performance of an arbitrary algorithm without any special consideration at the protocol level.
+
+%Our design of the system included the implementation of a \texttt{Paxos\_Server} class that contained within it the components of Paxos---the \texttt{Paxos\_Acceptors} and \texttt{Paxos\_Proposers}.  Each \texttt{Paxos\_Server} contained within it the different parameters to be set and used.  As development progressed, it became clear that the lines between each Paxos component (acceptor and proposer) and the server were blurring, so in future development, these distinctions will likely be removed.
+In general, our approach can be broken down into three categories:
+1) measurement: we instrument our Paxos code to capture information about its surrounding environment;
+2) policy: we separate the concerns of making good decisions about how and what to do with the more mundane concerns of actually accomplishing them;
+and 3) tuning: ultimately, any feedback loop needs an actuator for activity, and ours is no different.
+
 \subsection{Measurement}
-In order to sufficiently be able to make adjusts for the changing environment, the environment first had to be measured.  In order to accomplish this, we introduced the \texttt{Telemetry} class.  The \texttt{Telemetry} class has components to track the different measures of our environment of which we were interested including its latency and node failure rates.  In order to ensure that all members of the quorum maintain the same constants, static methods of the \texttt{Telemetry} class were used.
+In order to capture the requisite statistics, we augmented our Paxos implementation with a centralized clearinghouse module we call the \texttt{Telemetry} class.
+We are primarily interested in collected two salient pieces of information:
+an estimate of the communications latency in the system, and the approximate failure rate of our nodes.
+
+Our Paxos code uses a long-lived master, and heartbeat messages allow subordinates in the system to determine when the master has failed.
+Since these messages are regularly sent to all nodes in the system, they are an ideal mechanism for measuring the point-to-point round trip time (RTT).
+Similarly, node faults are detected through timeouts on expected messages, usually heartbeat messages and their responses.
+We simply mark every timer expiration with code that records relevant information about the failure event to the \texttt{Telementry} class.
+
+It is important to recognize that both of these features are \emph{estimates} of actual behavior.
+The system has no oracle to guide it, and we study the accuracy of these methods in section~\ref{evaluation}.
+
+%The \texttt{Telemetry} class has components to track the different measures of our environment of which we were interested including its latency and node failure rates.  In order to ensure that all members of the quorum maintain the same constants, static methods of the \texttt{Telemetry} class were used.
 
 % latency
-\texttt{Telemetry} contains an average round-trip time (RTT) measure used to estimate the average network latency.  The current master calculates the average RTT from sending its heartbeat to all of the nodes in the quorum, then it updates the overall estimated RTT in Telemetry which is subsequently used to calculate the latency (RTT / 2). %FIXME: more details--update_rtt_estimate
+%\texttt{Telemetry} contains an average round-trip time (RTT) measure used to estimate the average network latency.  The current master calculates the average RTT from sending its heartbeat to all of the nodes in the quorum, then it updates the overall estimated RTT in Telemetry which is subsequently used to calculate the latency (RTT / 2). %FIXME: more details--update_rtt_estimate
 
 % failure
-Failures are tracked in a similar way to the RTT: each time a node thinks a failure has occurred, it updates a statically global failure tracker in \texttt{Telemetry}.  This happens in two settings:
-\begin{enumerate}
-	\item The master notices a node's failure when sending a heartbeat from its response timing out.
-	\item A node notices a master's failure from a master's timeout.
-\end{enumerate}
-In either case, there can be either true failures and false failures, but nodes cannot tell the difference; both are thus recorded in \texttt{Telemetry}.  The distinction is made, though, between perceived master failures and perceived node failures (with the latter being a perceived master failure).
+%Failures are tracked in a similar way to the RTT: each time a node thinks a failure has occurred, it updates a statically global failure tracker in \texttt{Telemetry}.  This happens in two settings:
+%\begin{enumerate}
+%	\item The master notices a node's failure when sending a heartbeat from its response timing out.
+%	\item A node notices a master's failure from a master's timeout.
+%\end{enumerate}
+%In either case, there can be either true failures and false failures, but nodes cannot tell the difference; both are thus recorded in \texttt{Telemetry}.  The distinction is made, though, between perceived master failures and perceived node failures (with the latter being a perceived master failure).
 
 \subsection{Policy}
 % policy = minimize cost
 % explain cost models (uptime, traffic, recovery)
-We defined our policy of adjustment to minimize the cost of continued recoveries (re-elections) and messages (heartbeats).  This was assessed in the form of calculating a particular environment's "goodness."  We defined goodness to be the uptime of the Paxos system divided by the traffic of the system: $Goodness = \frac{uptime}{traffic}$.  In this way, we calculated Goodness in the following way:
-\begin{equation}
-	Goodness = \frac
-	{F_{mf}  T_{to}}
-	{2 (F_{hb}C_{hb} + False\_fail C_r)}
-\end{equation}
-where $F_{mf}$ is the mean time between failures (MTBF), $T_{to}$ is the master timeout constant, $F_{hb}$ is the heartbeat frequency, $C_{hb}$ is the cost of sending a heartbeat, $False\_fail$ is the false failure rate, and $C_r$ is the cost of recovery---that is, the cost of recovering from a master failure.
+With more information, we enable informed decision-making.
+Our policy module is responsible for converting the raw data from software instrumentation into actionable decisions.
+Specifically, we use an analytical cost-model to optimize for performance.
+At a high level, the model is just a mathematical way of describing ``goodness.''
+While many others would have worked, we chose to express efficacy as the ratio of client availability (simplified as uptime) to cost (data transferred across the network).
+To be concrete, we use the set of equations below to quantify what we mean by these terms:
 
-Further, $False\_fail$ is defined by the cumulative density function of $F_{hb}, T_l,$ and $T_{to}$:
 \begin{equation}
-	False\_fail = CDF ( \frac{1}{F_{hb}} + T_l - T_{to} )
+	\mathrm{PMetric} = \frac%
+{	\Tbf - \Ptf - \Pff } % Uptime
+{	\frac{\Chb}{\Thb} + \frac{\Cr}{\Tbf} + \Pff\Cr } % Traffic
 \end{equation}
 
-\subsection{Adaptation}
+where $\Tbf$ is the mean time between failures (MTBF), $\Tto$ is the master timeout constant, $\Thb$ is the heartbeat interval, $\Chb$ is the cost of sending a single pointwise heartbeat, $\Pff$ and $\Ptf$ are the probabilities of our timeout flagging a false failure or detecting a true failure, respectively, and $\Cr$ is the cost of recovery, that is, the cost of recovering from a master failure.
+The subexpressions are $\Pff$ and $\Ptf$ are:
+
+\begin{equation}
+	\Pff = \mathrm{CDF}_{N(0,\sigma)} \Thb + \Tl - \Tto
+\end{equation}
+
+\begin{equation}
+	\Ptf = 1-\mathrm{CDF}_{Exp(\frac{1}{\Tbf-\Tl})} 1000
+\end{equation}
+
+where the notation $\mathrm{CDF}_{N(\mu,\sigma)}$ and $\mathrm{CDF}_{\mathrm{Exp}(\lambda)}$ represent the cumulative distribution functions for a normal and exponential distributions.
+
+\subsection{Tuning}
 % adjust HB freq
-Using this measure of goodness, each node in the quorum measures its environment adjusts its own parameters accordingly.  It accomplishes this by using the \texttt{Telemetry} class to get the measure of the network latency and master failure rate and then iteratively testing a [window] of values to determine values of the heartbeat frequency and master timeouts that result in the highest possible goodness for the current environment.
-% proactively push measurement info
+Using this measure, each node in the quorum measures its environment adjusts its own parameters on regular intervals.
+While we could have used more advanced techniques, our implementation uses brute force to identify the most viable parameters for a given system.
+We simply iterate over the space of all possible parameter combinations until we arrive at a minimum.
+We then directly assign values to various locations in memory.
+No human intervention is necessary for this, and the process occurs many times per second.
+
+
+
+
