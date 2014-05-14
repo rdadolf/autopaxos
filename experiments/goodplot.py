@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 import sys
 import re
 import numpy as np
@@ -30,27 +29,46 @@ rcParams['font.weight'] = 100
 # ^^^^^ MPL Boilerplate ^^^^^
 ################################################################################
 
+def g(T_hb, T_bf, T_to, T_l, C_r, C_hb):
+  # UPTIME
+  # True failure detection & recovery
+  #   (MTBF - blindWin+electionWin)
+  # False failure recovery
+  #   (1-P_ff) * electionWin
+  # P_ff Fixed latency model
+  #P_ff = (T_hb+T_l) > T_to
+  # P_ff Gaussian latency model (std=100ms)
+  P_ff = scipy.stats.norm.cdf( T_hb+T_l-T_to, loc=0, scale=100 )
 
-F_hb = 1/(np.linspace(50,1000,100))
+  # TRAFFIC
+  # Heartbeat overhead
+  #   C_hb/T_hb
+  # True failure recovery
+  #   C_r/T_bf
+  # False failure recovery
+  #   P_ff * C_r
+  
+  uptime = T_bf - ((T_to/2+T_l) + 4*T_l) + (1-P_ff)*(4*T_l)
+  traffic= C_hb/T_hb + C_r/T_bf + P_ff*C_r
+  return uptime/traffic
+  
 
-F_mf = 0.00003 # failure per second
-T_to = 1000. # master timeout, in ms
-T_l = 250. # latency, in ms
-C_r = 10. # recovery cost, in packets
-C_hb = 1. # heartbeat cost, in packets
-
-def g(F_hb, F_mf, T_to, T_l, C_r):
-  #false_fail = ((1./F_hb)+T_l) > T_to
-  false_fail = scipy.stats.norm.cdf( (1./F_hb+T_l-T_to), loc=0, scale=100 )
-  return (F_mf * T_to) / (2*( F_hb*C_hb + false_fail*C_r))
-
-(fig,ax) = plt.subplots()
-for T_to in np.linspace(500,3000,6):
-  goodness = g(F_hb, F_mf, T_to, T_l, C_r)
-  ax.plot(F_hb, goodness, label='timeout='+str(T_to))
-  print 1./F_hb[np.argmax(goodness)], np.max(goodness)
-ax.set_xlabel('Heartbeat frequency')
-ax.set_ylabel('Goodness')
-ax.legend()
-fig.savefig('good.png')
-
+if __name__=='__main__':
+  T_hb = (np.linspace(10,5000,200))
+  
+  T_bf = 3000. # MTBF (ms)
+  T_to = 1000. # master timeout, in ms
+  T_l = 250. # latency, in ms
+  C_r = 20. # recovery cost, in packets
+  C_hb = 2. # heartbeat cost, in packets
+  (fig,ax) = plt.subplots()
+  for T_to in np.linspace(500,4000,8):
+    goodness = g(T_hb, T_bf, T_to, T_l, C_r, C_hb)
+    ax.plot(T_hb, goodness, label=r'$T_{TO}$='+str(T_to))
+    print T_hb[np.argmax(goodness)], np.max(goodness)
+  ax.axvline(T_bf,color='k',label=r'$T_{BF}$')
+  ax.set_xlabel('Heartbeat interval')
+  ax.set_ylabel('Goodness')
+  ax.legend()
+  fig.savefig('good.png')
+  
