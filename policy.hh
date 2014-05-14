@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cmath>
 #include "float.h"
+#include <math.h>
 
 // variation on http://www.johndcook.com/blog/2009/01/19/stand-alone-error-function-erf/
 static inline double approx_erf(double x) {
@@ -46,7 +47,9 @@ static inline double pmetric( double T_hb, // Heartbeat interval
   //P_ff = (T_hb+T_l) > T_to
   // P_ff Gaussian latency model (std=100ms)
   P_ff = cdf( T_hb+T_l-T_to, 0, 100 );
-  uptime = T_bf - ((T_to/2+T_l) + 4*T_l) + (1-P_ff)*(4*T_l);
+  double P_tf;
+  P_tf = exp(-1000./T_bf);
+  uptime = 1 - P_tf - P_ff;
 
   double traffic;
   // Heartbeat overhead
@@ -75,7 +78,7 @@ static inline std::pair<double,double>
 get_best_params(double min_T_hb, double max_T_hb, double step_T_hb, // sweep T_hb
                 double min_T_to, double max_T_to, double step_T_to, // sweep T_to
                 double T_bf, double T_l, double C_r, double C_hb) { // fix others
-    double best_T_hb, best_T_to;
+    double best_T_hb(0), best_T_to(0);
     double best_p = -DBL_MAX;
     for (double thb = min_T_hb; thb < max_T_hb; thb += step_T_hb) {
         for (double tto = min_T_to; tto < max_T_to; tto += step_T_to) {
