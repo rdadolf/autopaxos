@@ -412,12 +412,14 @@ tamed void Paxos_Acceptor::receive_heartbeat(modcomm_fd& mpfd,RPC_Msg req) {
     mpfd.write(res);
 }
 
+
+bool Paxos_Server::enable_autopaxos = false;
 // config should have have the form Json::array(Json::array(paxos_server port,paxos_acceptor port))
 Paxos_Server::Paxos_Server(int port, int paxos, Json config,int master) {
     listen_port_ = port;
     master_ = master;
     master_timeout_ = 500;
-    heartbeat_freq_ = 200; // was originally master_timeout_/2
+    heartbeat_interval_ = 200; // was originally master_timeout_/2
     heartbeat_timeout_ = master_timeout_;
     epoch_ = (master_ < 0) ? 0 : 1;
     config_ = config;
@@ -595,11 +597,11 @@ tamed void Paxos_Server::beating_heart(tamer::event<> ev) {
         if (!stopped_) {
             INFO() << paxos_port_ << " Paxos_Server sending heartbeat. epoch: " << epoch_;
             // Do not wait. Let the heartbeats go on their own.
-            // We need to send another round in hb_freq_ ms,
+            // We need to send another round in hb_int_ ms,
             // regardless of whether these are done.
             proposer_->send_heartbeat();
         }
-        twait { tamer::at_delay_msec(heartbeat_freq_, make_event()); }
+        twait { tamer::at_delay_msec(heartbeat_interval_, make_event()); }
     }
     ev();
 }
@@ -635,20 +637,34 @@ tamed void Paxos_Server::receive_request(Json args, tamer::event<Json> ev) {
     ev.unblock();
 }
 tamed void Paxos_Server::policy_decision() {
-    tvars {
-        double p,C_r(20),C_hb(2);
-        std::pair<double,double> params;
+  tvars {
+    double p, T_hb, T_bf, T_to, T_l, C_r, C_hb;
+    std::pair<double,double> params;
+  }
+  while (1) {
+    twait { at_delay_msec(200,make_event()); } // FIXME: arbitrary delay
+    T_hb = heartbeat_interval_;
+    T_bf = Telemetry::mtbf_/1000.; // us -> ms
+    T_to = master_timeout_;
+    T_l  = Telemetry::rtt_estimate_/2000.; // rtt us -> latency ms
+    C_r  = 20; // Magic Packet
+    C_hb = 2;  // Cost Constants
+    p = pmetric( T_hb, T_bf, T_to, T_l, C_r, C_hb );
+    DATA() << "PMetric estimate before tuning: " << p;
+
+    if( enable_autopaxos ) {
+      INFO() << "Autotuning  parameters";
+      // eventually for updated hbf and mto
+      params = get_best_params( 100, 800, 20, // T_hb (min, max, step)
+                                800,1600, 20, // T_to (min, max, step)
+                                T_bf, T_l, C_r, C_hb );
+      heartbeat_interval_ = params.first;
+      master_timeout_ = params.second;
+      DATA() << "Autopaxos chose T_hb = "<< heartbeat_interval_;
+      DATA() << "Autopaxos chose T_to = "<< master_timeout_;
+
+      p = pmetric( T_hb, T_bf, T_to, T_l, C_r, C_hb );
+      DATA() << "Current PMetric estimate after tuning: " << p;
     }
-    while (1) {
-        twait { at_delay_msec(2000,make_event()); } // FIXME: arbitrary delay
-        // FIXME: THIS IS ALL WRONG
-        p = pmetric(heartbeat_freq_, Telemetry::mtbf_, master_timeout_, 
-                    Telemetry::rtt_estimate_/2, C_r, C_hb);
-        // eventually for updated hbf and mto
-        /*params = get_best_params(50, 1000, 50, 100, 2000, 100,
-                                 Telemetry::mtbf_, Telemetry::rtt_estimate_/2, C_r, C_hb);
-        heartbeat_freq_ = params.first;
-        master_timeout_ = params.second;*/
-        DATA() << "[pmetric]: " << p;
-    }
+  }
 }
