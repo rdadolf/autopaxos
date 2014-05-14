@@ -93,7 +93,7 @@ tamed void fail_node(std::vector<Paxos_Server*> ps, const int i)
   tvars { }
   ps[i]->stop();
   DATA() << "Stopped node "<<i;
-  twait { at_delay_msec(100, make_event()); }
+  twait { at_delay_msec(TIMEOUT_INTERVAL+100, make_event()); }
   ps[i]->start();
   DATA() << "Started node "<<i;
 }
@@ -125,7 +125,8 @@ tamed void randomly_fail(std::vector<Paxos_Server*> ps, const int n)
   while(1) {
     rand_node = ( brand(&br_state) % n);
     nodes_tried = 0;
-    while(ps[rand_node]->stopped_ || ps[rand_node]->i_am_master() && nodes_tried<n-1) {
+    //while((ps[rand_node]->stopped_ || ps[rand_node]->i_am_master()) && nodes_tried<n-1) {
+    while(ps[rand_node]->stopped_ && nodes_tried<n-1) {
       rand_node = (rand_node+1)%n;
       nodes_tried+=1;
     }
@@ -169,7 +170,7 @@ tamed void run() {
   DATA() << "Latency set to: " << 10;
   for (i=0; i<n; ++i) {
     ps[i] = new Paxos_Server(server_port_s+i, paxos_port_s+i, config, master);
-    ps[i]->master_timeout_ = 1000000;//never
+    ps[i]->master_timeout_ = TIMEOUT_INTERVAL;
     ps[i]->heartbeat_freq_ = HEARTBEAT_INTERVAL;
   }
   DATA() << "Heartbeat frequency set to: " << HEARTBEAT_INTERVAL;

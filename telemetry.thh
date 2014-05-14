@@ -49,18 +49,25 @@ public:
                              << " [with] " << new_estimate;
   }
 
-  static void drop_event(uint64_t when)
+  static void initialize_drops()
   {
     int i;
     uint64_t now;
+
+    mtbf_ = 1000000; // reasonable default
+    drop_times_ = (uint64_t *)malloc(drop_window_*sizeof(uint64_t));
+    now = time();
+    for(i=0;i<drop_window_;i++)
+      drop_times_[i] = now - mtbf_;
+  }
+
+  static void drop_event(uint64_t when)
+  {
+    if( n_drops_==0 )
+      initialize_drops();
+
+    // Otherwise, it's the first time
     DATA() << "Detected node drop event";
-    if( n_drops_==0 ) {
-      mtbf_ = 1000000; // reasonable default
-      drop_times_ = (uint64_t *)malloc(drop_window_*sizeof(uint64_t));
-      now = time();
-      for(i=0;i<drop_window_;i++)
-        drop_times_[i] = now - mtbf_;
-    }
     drop_times_[last_drop_] = when;
     ++n_drops_;
     if( n_drops_>=drop_window_ ) {
@@ -69,6 +76,7 @@ public:
     }
     last_drop_ = (last_drop_+1)%drop_window_;
   }
+
   static void master_drop_event(int epoch, uint64_t when)
   {
     if( epoch > epoch_counter_ ) { // only want this is we haven't already done a master_drop event
