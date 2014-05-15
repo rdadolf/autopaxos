@@ -68,6 +68,14 @@ The takeaway here is that while nonlinear, the search space is surprisingly smoo
 \end{center}
 \end{figure}
 
-%\subsection{Tuning}
+\subsection{Tuning}
 % monotonic shift
-% oscillation
+In order to evaluate efficacy of our policy model in improving the performance of our Paxos System, we subjected the Paxos System to a environment with a monotonically increasing latency (Figure~\ref{monotonic_shift}).  As latency of the network increases with time, the Goodness of the network accordingly decreases.  We hypothesized that as the network becomes worse, the non-adjusting Paxos system would continue to worsen in its goodness score as well while the autotuning one would be relatively unaffected, yet here we observe the opposite suggesting that the changes that \emph{Autopaxos} is making to its parameters is actually hurting its performance. 
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=\columnwidth]{monotonic_shift}
+\caption{Monotonic Shift of Latency.  Goodness measures the actual $\frac{uptime}{traffic}$ of the system on the network.}
+\label{monotonic_shift}
+\end{center}
+\end{figure}

@@ -548,9 +548,6 @@ tamed void Paxos_Server::read_and_dispatch(tamer::fd client_fd)
   }
 }
 
-//Json Telemetry::true_drops_; // true drops are noted when the node is stopped using the stop message
-//Json Telemetry::perceived_drops_;
-
 uint64_t Telemetry::rtt_estimate_;
 
 int64_t Telemetry::epoch_counter_ = 0;
@@ -563,16 +560,6 @@ bool *Telemetry::drop_history_ = NULL;
 
 void Paxos_Server::stop(){
     stopped_ = true;
-    /*
-    Json d = Json::make_array();
-    d.push_back(Telemetry::time());
-    if( i_am_master() ) {
-        DATA() << "MASTER " << paxos_port_ << " DEAD";
-        d.push_back(true);
-    } else 
-        d.push_back(false);
-    Telemetry::true_drops_.push_back(d);
-    */
     INFO() << "server " << listen_port_ << " stopping.";
 }
 
