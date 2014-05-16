@@ -61,7 +61,7 @@ main: main.o paxos.o $(COMMON_OBJ) $(MPRPC_OBJ) $(MPRPC_HDR)
 nnodes: nnodes.o paxos.o $(COMMON_OBJ) $(COMMON_HDR) $(MPRPC_OBJ) $(MPRPC_HDR)
 	$(CXX) $(COMMON_OBJ) $(MPRPC_OBJ) $< -o nnodes $(LDFLAGS)
 
-EXPERIMENTS=experiments/track_rtt experiments/monotonic_shift experiments/track_drops experiments/track_policy
+EXPERIMENTS=experiments/track_rtt experiments/monotonic_shift experiments/track_drops experiments/track_policy experiments/goodput
 experiments: $(EXPERIMENTS)
 
 $(addsuffix .o,$(EXPERIMENTS)): %.o: %.cc $(COMMON_HDR) $(MPRPC_HDR)
@@ -86,7 +86,7 @@ echo:
 	@echo $(TAMED_CC)
 # Cleanup
 persist_clean:
-	rm -f *persist log.txt
+	rm -f *persist log*.txt
 	rm -f experiments/*persist experiments/log.txt
 clean: persist_clean
 	rm -f $(TAMED_HH) $(TAMED_CC)

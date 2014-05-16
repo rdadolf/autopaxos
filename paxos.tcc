@@ -118,7 +118,7 @@ start:
     tamer::at_delay_sec(4,r.make_event(true)); // FIXME: 4 seconds is...?
     twait(r,to);
     if (to) {
-        INFO() << "restarting after accept";;
+        INFO() << uid_ << " restarting after accept";;
         goto start;
     }
     
@@ -189,7 +189,7 @@ tamed void Paxos_Proposer::accept(int n, tamer::event<> done) {
     for (i = 0; i < (unsigned)(f + 1); ++i) {
         twait(r,ret);
         //assert(res[ret].content()[0].is_i() && res[ret].content()[1].is_i());
-        if( res[ret].content()[0].is_i() && res[ret].content()[1].is_i() ) {
+        if( !res[ret].content()[0].is_i() && !res[ret].content()[1].is_i() ) {
           --i;
           continue; // will get a json assertion error if this is allowed to go to the "n =" line, 
                     // and the second member isn't an int

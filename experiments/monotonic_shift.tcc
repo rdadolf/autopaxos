@@ -152,7 +152,7 @@ tamed void randomly_fail(std::vector<Paxos_Server*> ps, const int n)
   }
 }
 
-tamed void run() {
+tamed void run(const bool auto_) {
   tvars {
     int n(7),server_port_s(15800),paxos_port_s(15900),i;
     std::vector<Paxos_Server*> ps(n);
@@ -189,7 +189,8 @@ tamed void run() {
   twait { at_delay_msec(1000, make_event()); }
 
   // Experiment
-  Paxos_Server::enable_autopaxos = true;
+  Paxos_Server::enable_autopaxos = auto_;
+  INFO() << "autopaxos set " << ((auto_) ? "ON" : "OFF" );
 
   //modulate_failure_rate(DROP_MIN_INTERVAL, DROP_MAX_INTERVAL);
   failure_interval = 1200;
@@ -209,11 +210,22 @@ tamed void run() {
   tamer::break_loop();
 }
 
-int main() {
+
+static Clp_Option options[] = {
+        { "autopaxos", 'a', 0, 0, Clp_Negate }
+};
+
+int main(int argc, const char** argv) {
+    Clp_Parser* clp = Clp_NewParser(argc,argv,sizeof(options) / sizeof(options[0]), options);
+    bool auto_ = false;
+    while (Clp_Next(clp) != Clp_Done) {
+        if (Clp_IsLong(clp,"autopaxos"))
+            auto_ = !clp->negated;
+    }
     // remove persistant files and log
     tamer::initialize();
     system("rm -rf *_persist log.txt");
-    run();
+    run(auto_);
     tamer::loop();
     tamer::cleanup();
     return 0;

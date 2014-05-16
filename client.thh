@@ -112,8 +112,11 @@ tamed void Paxos_Client::make_request(Json msg, tamer::event<Json> ev) {
         RPC_Msg req,ret;
         int done(0);
     }
-    if (!mpfd_)
+    twait { get_master(make_event()); }
+    if (!mpfd_) {
+        std::cerr << "!mpfd_" << std::endl;
         abort();
+    }
     do {
         INFO() << "making request to " << master_;
         req = RPC_Msg(Json::array("request",msg));

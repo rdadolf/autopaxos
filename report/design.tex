@@ -14,13 +14,12 @@
 \section{Design}
 We designed our model system around the same abstractions provided by Lamport in his original Paxos paper.
 Our system contains modules for Paxos proposers and accepters, as well as client-level server objects.
-While notionally separate entities, practically speaking the system can be viewed as a near-monolithic collection of coroutines written using the tamer \cite{Krohn07} event programming DSL.
+While notionally separate entities, practically speaking the system can be viewed as a near-monolithic collection of coroutines written using the Tamer \cite{Krohn07} event programming DSL.
 
 We have not streamlined or optimized our implementation of Paxos.
 As previously mentioned, our goal is not to demonstrate the fastest or most efficient version of a distributed consensus;
 instead, we show that our work can improve the performance of an arbitrary algorithm without any special consideration at the protocol level.
 
-%Our design of the system included the implementation of a \texttt{Paxos\_Server} class that contained within it the components of Paxos---the \texttt{Paxos\_Acceptors} and \texttt{Paxos\_Proposers}.  Each \texttt{Paxos\_Server} contained within it the different parameters to be set and used.  As development progressed, it became clear that the lines between each Paxos component (acceptor and proposer) and the server were blurring, so in future development, these distinctions will likely be removed.
 In general, our approach can be broken down into three categories:
 1) measurement: we instrument our Paxos code to capture information about its surrounding environment;
 2) policy: we separate the concerns of making good decisions about how and what to do with the more mundane concerns of actually accomplishing them;
@@ -38,19 +37,6 @@ We simply mark every timer expiration with code that records relevant informatio
 
 It is important to recognize that both of these features are \emph{estimates} of actual behavior.
 The system has no oracle to guide it, and we study the accuracy of these methods in section~\ref{evaluation}.
-
-%The \texttt{Telemetry} class has components to track the different measures of our environment of which we were interested including its latency and node failure rates.  In order to ensure that all members of the quorum maintain the same constants, static methods of the \texttt{Telemetry} class were used.
-
-% latency
-%\texttt{Telemetry} contains an average round-trip time (RTT) measure used to estimate the average network latency.  The current master calculates the average RTT from sending its heartbeat to all of the nodes in the quorum, then it updates the overall estimated RTT in Telemetry which is subsequently used to calculate the latency (RTT / 2). %FIXME: more details--update_rtt_estimate
-
-% failure
-%Failures are tracked in a similar way to the RTT: each time a node thinks a failure has occurred, it updates a statically global failure tracker in \texttt{Telemetry}.  This happens in two settings:
-%\begin{enumerate}
-%	\item The master notices a node's failure when sending a heartbeat from its response timing out.
-%	\item A node notices a master's failure from a master's timeout.
-%\end{enumerate}
-%In either case, there can be either true failures and false failures, but nodes cannot tell the difference; both are thus recorded in \texttt{Telemetry}.  The distinction is made, though, between perceived master failures and perceived node failures (with the latter being a perceived master failure).
 
 \subsection{Policy}
 % policy = minimize cost
@@ -88,7 +74,3 @@ While we could have used more advanced techniques, our implementation uses brute
 We simply iterate over the space of all possible parameter combinations until we arrive at a minimum.
 We then directly assign values to various locations in memory.
 No human intervention is necessary for this, and the process occurs many times per second.
-
-
-
-

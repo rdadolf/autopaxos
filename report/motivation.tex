@@ -3,7 +3,7 @@
 % For TeXShop on OS X and Herbert Schulz's latexmk engine.
 
 \section{Motivation}
-System tuning is hard; some consider it an art, and many admins dedicate a are employed specifically to tweak keep large installations running.
+System tuning is hard; indeed, some consider it an art, and many systems admins are often employed specifically to keep large installations running and tweak underlying parameters.
 Spending weeks or even months on finely crafting heuristics and parameters for a large installation can have measurable impacts, but these gains are fickle.
 A failure, a new component, or a system upgrade can wipe out all that effort in moments.
 Perhaps the system still functions correctly, even with reasonable performance, but that last slice is gone, and replacing it requires yet another sizable of time and effort.
@@ -23,8 +23,3 @@ It is these features that expose the tangle of tuning parameters and dependent b
 Instead of forcing a human to derive and assign static values, we suggest a model where the system itself assigns its own parameters.
 Specifically, we aim to build a Paxos system that measures its network and neighbor characteristics and responds appropriately by adjusting its timeout and RPC constants to achieve better performance.
 We hypothesize that a Paxos system that \emph{measures} and \emph{adapts} to its environment will perform better than one that does not.
-
-
-%The implementation of our Paxos contains certain constants that greatly affect the behavior of the system.  In our implementation, we have the two constants of "master timeouts" and "heartbeat frequencies" that can influence the behavior and performance of our system.  Often such constants are evaluated and determined in the network of operation to determine the ideal values for the best overall performance, and these values are seldom revisited at later times.  Because the conditions of network (i.e. network latency) can change [--citation?--], as time goes on, those initially determined constants may no longer be the best values given the change in the network.
-
-%Because of this, we hypothesized that a Paxos system that \textit{measures} and \textit{adapts} to its environment will perform better than one that does not.  Specifically, we aimed to build a Paxos system that measured its network latency and node drops and responds appropriately by adjusting its master timeout and heartbeat frequency constants to better perform in its current environment.  

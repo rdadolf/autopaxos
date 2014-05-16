@@ -70,12 +70,22 @@ The takeaway here is that while nonlinear, the search space is surprisingly smoo
 
 \subsection{Tuning}
 % monotonic shift
-In order to evaluate efficacy of our policy model in improving the performance of our Paxos System, we subjected the Paxos System to a environment with a monotonically increasing latency (Figure~\ref{monotonic_shift}).  As latency of the network increases with time, the Goodness of the network accordingly decreases.  We hypothesized that as the network becomes worse, the non-adjusting Paxos system would continue to worsen in its goodness score as well while the autotuning one would be relatively unaffected, yet here we observe the opposite suggesting that the changes that \emph{Autopaxos} is making to its parameters is actually hurting its performance. 
+To actually demonstrate the efficacy of our Paxos System in improving its PMetric score, we subjected the Paxos System to a environment with a monotonically increasing latency (Figure~\ref{monotonic_shift}).  As the network becomes worse, the non-adjusting Paxos system should continue to worsen in its PMetric score as well while the autotuning one would be relatively unaffected.  Here, we show that indeed the system which utilizes autotuning does display a higher PMetric for the duration of the experiment, but contrary to our hypothesis, after the initial jump in the PMetric score for the auto tuning system, both PMetric scores track with about the same slope.  This suggests that our chosen PMetric may not be capturing all of the relevant information in the best way to appropriately determine the best parameters for the system.
 
 \begin{figure}[htbp]
 \begin{center}
 \includegraphics[width=\columnwidth]{monotonic_shift}
-\caption{Monotonic Shift of Latency.  Goodness measures the actual $\frac{uptime}{traffic}$ of the system on the network.}
+\caption{Monotonically Increasing Latency.}
 \label{monotonic_shift}
+\end{center}
+\end{figure}
+
+In order to evaluate how well our system adjusts to latency to improve its performance, we measured the system's goodput by determining the time it takes for our system to serve a fixed number of client requests where each request requires a full instance of Paxos.  Figure~\ref{goodput} shows how well a system using autotuning compares to one that does not in terms of its goodput with monotonically increasing network latency.  For the most part, both systems track very well in terms of how their goodputs change with changing latency implying further that our PMetric does not catch the interesting network metrics in the most significant way to make the best parameter decisions; however, there is a point in time when the latency gets relatively large where the system using autotuning \emph{does} perform better than the one which does not.  This suggests that what our PMetric measures most is elements of the system that make the most difference in extreme environments.  
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=\columnwidth]{goodput}
+\caption{Measuring Goodput with a Changing Latency.}
+\label{goodput}
 \end{center}
 \end{figure}
